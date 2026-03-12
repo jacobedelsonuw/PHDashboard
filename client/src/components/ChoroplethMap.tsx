@@ -357,7 +357,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     return bVal - aVal;
   });
 
-  const geoJsonKey = `${selectedMetric}-${hoveredState?.abbreviation || ""}`;
+  const geoJsonKey = `${selectedMetric}-${selectedYear}-${hoveredState?.abbreviation || ""}`;
   const formatMetricValue = (metricKey: Metric, value: number) => {
     if (metricKey === GAP_METRIC) return value.toFixed(2);
     if (metricKey === "suicide_rate") return value.toFixed(1);
@@ -897,8 +897,8 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                   <h3 className="font-semibold text-lg">Mental Health Financing Snapshot ({selectedYear})</h3>
                   <p className="text-sm text-muted-foreground">
                     {selectedFinancingRecord.financing_data_status === "partially_official"
-                      ? "Uses direct SAMHSA MHBG award/allotment tables where available for this year, with the remaining financing context harmonized from the project financing model."
-                      : "This year is still shown from the harmonized financing model pending direct URS/CMS ETL."}
+                      ? "Uses direct SAMHSA MHBG and CMS Financial Management Report inputs where available for this year, with modeled fallbacks for the remaining financing context."
+                      : "This year is still shown from the harmonized financing model pending additional direct official financing extracts."}
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div className="p-3 bg-blue-50 rounded-lg">
@@ -969,6 +969,11 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                     <div className="p-3 bg-muted/50 rounded-lg">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">Medicaid Expenditures</p>
                       <p className="text-lg font-bold text-foreground">${selectedFinancingRecord.medicaid_total_expenditures_millions.toLocaleString()}M</p>
+                      {selectedFinancingRecord.official_cms_federal_share_millions && selectedFinancingRecord.official_cms_state_share_millions ? (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Fed ${selectedFinancingRecord.official_cms_federal_share_millions.toLocaleString()}M / State ${selectedFinancingRecord.official_cms_state_share_millions.toLocaleString()}M
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

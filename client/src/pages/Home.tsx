@@ -288,7 +288,7 @@ export default function Home() {
             Explore how mental health indicators have evolved in the United States from 2004 to 2024.
           </p>
           <p className="text-sm text-muted-foreground mt-3">
-            National trend lines are aligned to official U.S. sources listed below. State AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, opioid use disorder, suicide mortality, and resource availability now use official federal source files; the financing layer now incorporates direct SAMHSA MHBG award tables for published years and combines them with URS, CMS Medicaid expenditure reporting, and KFF policy context into an annual state comparison view. Country comparisons, burden-resource gap scoring, and the remaining disorder layers are still mixed or modeled.
+            National trend lines are aligned to official U.S. sources listed below. State AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, opioid use disorder, suicide mortality, and resource availability now use official federal source files; the financing layer now incorporates direct SAMHSA MHBG award tables, direct CMS Financial Management Report Medicaid expenditure workbooks where available, and KFF policy context into an annual state comparison view. A direct SAMHSA URS extractor is now included in the repo for the next financing-source materialization pass. Country comparisons, burden-resource gap scoring, and the remaining disorder layers are still mixed or modeled.
           </p>
         </div>
 
@@ -731,7 +731,7 @@ export default function Home() {
               </div>
             ))}
             <p className="text-sm text-muted-foreground">
-              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS; and the financing layer now uses direct SAMHSA MHBG award tables for FY2021-FY2023 while still harmonizing URS, CMS Medicaid expenditure reporting, and KFF policy context for the broader state-year comparison view. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
+              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS; and the financing layer now uses direct SAMHSA MHBG award tables, direct CMS Financial Management Report Medicaid expenditure workbooks where available, and KFF policy context for the broader state-year comparison view. A direct SAMHSA URS extractor is also included for the next financing-source materialization pass. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
             </p>
             <div className="pt-2">
               <h4 className="font-semibold text-foreground mb-3">Metric Provenance Status</h4>

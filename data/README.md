@@ -27,5 +27,11 @@ Important:
 - The dashboard now pulls state-level `AMI`, `SMI`, `youth MDE`, `substance use disorder`, `alcohol use disorder`, and `opioid use disorder` from the official SAMHSA NSDUH 2023-2024 state-specific tables.
 - The dashboard now pulls state-level `suicide_rate` from the official CDC NCHS final 2023 state suicide table.
 - The dashboard now pulls state-level provider capacity from HRSA AHRF and facility capacity from SAMHSA N-SUMHSS 2024.
+- The financing layer now has direct official ETL support for:
+  - `SAMHSA MHBG` award/allotment tables already stored under `raw/official/financing`
+  - `CMS Financial Management Report` annual zip workbooks placed under `raw/official/financing/cms`
+  - `SAMHSA URS` state report pages/PDFs via a network-backed extractor
 - Rebuild the generated SAMHSA state metric module with `pnpm sources:extract`.
+- Rebuild official CMS financing data with `pnpm sources:extract:cms`.
+- Rebuild official URS financing data with `pnpm sources:extract:urs` (network access required).
 - Country comparisons, burden-gap scoring, and the remaining disorder-specific state series still need additional source normalization.

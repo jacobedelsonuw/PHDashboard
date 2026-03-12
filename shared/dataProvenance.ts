@@ -221,8 +221,8 @@ export const metricProvenance: MetricProvenance[] = [
     metric: "mental_health_financing",
     label: "Mental Health Financing",
     tier: "mixed",
-    status: "Integrated as a source-aligned multi-dataset financing layer with annual state views from 2016-2024; official SAMHSA MHBG award tables are now wired directly for published years.",
-    notes: "The financing dashboard now incorporates direct SAMHSA MHBG HTML tables for FY2021-FY2023 award/allotment components, then combines those official federal award values with SAMHSA URS concepts, CMS Medicaid expenditure reporting concepts, and KFF policy context in a harmonized state-year comparison layer. URS and CMS raw-file ETL is still the next step.",
+    status: "Integrated as a mixed official/model state-year financing layer from 2016-2024 with direct SAMHSA MHBG and CMS Financial Management Report inputs where available.",
+    notes: "The financing dashboard now incorporates direct SAMHSA MHBG HTML tables for FY2021-FY2023 and direct CMS Financial Management Report Medicaid expenditure workbooks for the extracted CMS years. A direct SAMHSA URS extractor is now included in the repo and validated on live source files, but its full cross-state materialization is still the next financing-source pass. Remaining uncovered years and the KFF policy context layer still rely on harmonized modeling.",
     sources: [
       "SAMHSA Community Mental Health Services Block Grant",
       "SAMHSA Uniform Reporting System (URS) Output Tables",

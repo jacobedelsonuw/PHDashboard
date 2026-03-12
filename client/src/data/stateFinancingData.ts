@@ -1,4 +1,5 @@
 import { getStateResources, stateData } from "./stateData";
+import { officialCmsMedicaidExpendituresByStateYear } from "./officialCmsMedicaidExpenditures";
 import { officialMhbgAwardsByStateYear } from "./officialMhbgAwards";
 
 export const FINANCING_YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024] as const;
@@ -23,6 +24,9 @@ export interface StateFinancingRecord {
   federal_mental_health_funding_millions: number;
   official_mhbg_formula_millions?: number;
   official_mhbg_supplemental_millions?: number;
+  official_cms_total_net_expenditures_millions?: number;
+  official_cms_federal_share_millions?: number;
+  official_cms_state_share_millions?: number;
   financing_data_status: "modeled" | "partially_official";
   public_mh_spending_millions: number;
   medicaid_total_expenditures_millions: number;
@@ -77,7 +81,6 @@ export const stateFinancingData: StateFinancingRecord[] = FINANCING_YEARS.flatMa
   const yearOffset = year - FINANCING_YEARS[0];
   const federalGrowth = 1 + yearOffset * 0.037;
   const spendingGrowth = 1 + yearOffset * 0.051;
-  const medicaidGrowth = 1 + yearOffset * 0.058;
 
   return stateData.map((state) => {
     const resources = getStateResources(state.abbreviation);
@@ -102,6 +105,7 @@ export const stateFinancingData: StateFinancingRecord[] = FINANCING_YEARS.flatMa
       2
     );
     const officialMhbg = officialMhbgAwardsByStateYear[state.abbreviation]?.[year as 2021 | 2022 | 2023];
+    const officialCms = officialCmsMedicaidExpendituresByStateYear[state.abbreviation]?.[year];
     const officialMhbgFormulaMillions = officialMhbg?.formula_allotment_millions;
     const officialMhbgSupplementalMillions = round(
       (officialMhbg?.bsca_award_millions ?? 0) +
@@ -129,11 +133,14 @@ export const stateFinancingData: StateFinancingRecord[] = FINANCING_YEARS.flatMa
 
     const medicaidEnrollmentRate = clamp(0.12 + needIndex * 0.055 + yearOffset * 0.004, 0.11, 0.37);
     const medicaidEnrollment = Math.round(state.population * medicaidEnrollmentRate);
-    const medicaidExpenditurePerEnrollee = round(
+    const modeledMedicaidExpenditurePerEnrollee = round(
       clamp(6200 + needIndex * 780 + policyScore * 26 + yearOffset * 285, 5500, 14500),
       0
     );
-    const medicaidTotalExpendituresMillions = round((medicaidEnrollment * medicaidExpenditurePerEnrollee) / 1_000_000, 2);
+    const medicaidTotalExpendituresMillions =
+      officialCms?.total_net_expenditures_millions ?? round((medicaidEnrollment * modeledMedicaidExpenditurePerEnrollee) / 1_000_000, 2);
+    const medicaidExpenditurePerEnrollee = round((medicaidTotalExpendituresMillions * 1_000_000) / medicaidEnrollment, 0);
+    const financingDataStatus = officialMhbg || officialCms ? "partially_official" : "modeled";
 
     return {
       state: state.state,
@@ -143,7 +150,10 @@ export const stateFinancingData: StateFinancingRecord[] = FINANCING_YEARS.flatMa
       federal_mental_health_funding_millions: federalMentalHealthFundingMillions,
       official_mhbg_formula_millions: officialMhbgFormulaMillions,
       official_mhbg_supplemental_millions: officialMhbgSupplementalMillions || undefined,
-      financing_data_status: officialMhbg ? "partially_official" : "modeled",
+      official_cms_total_net_expenditures_millions: officialCms?.total_net_expenditures_millions,
+      official_cms_federal_share_millions: officialCms?.total_net_expenditures_federal_share_millions,
+      official_cms_state_share_millions: officialCms?.total_net_expenditures_state_share_millions,
+      financing_data_status: financingDataStatus,
       public_mh_spending_millions: publicMhSpendingMillions,
       medicaid_total_expenditures_millions: medicaidTotalExpendituresMillions,
       medicaid_enrollment: medicaidEnrollment,
