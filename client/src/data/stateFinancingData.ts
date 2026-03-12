@@ -173,6 +173,23 @@ export interface MedicaidExpansionPolicyRegressionSummary {
   caution: string;
 }
 
+export interface NeedFundingScatterPoint {
+  state: string;
+  abbreviation: string;
+  year: FinancingYear;
+  need_index: number;
+  public_mh_spending_per_capita: number;
+  predicted_public_mh_spending_per_capita: number;
+  funding_gap_per_capita: number;
+  funding_gap_score: number;
+}
+
+export interface NeedFundingScatterSummary {
+  points: NeedFundingScatterPoint[];
+  line: Array<{ need_index: number; predicted_public_mh_spending_per_capita: number }>;
+  outliers: NeedFundingScatterPoint[];
+}
+
 export const financingMetricLabels: Record<FinancingMetric, string> = {
   mhbg_per_capita: "MHBG Funding per Capita ($)",
   federal_mental_health_funding_per_capita: "Federal Mental Health Funding per Capita ($)",
@@ -902,3 +919,85 @@ const medicaidExpansionPolicyRegression: MedicaidExpansionPolicyRegressionSummar
 })();
 
 export const getMedicaidExpansionPolicyRegression = () => medicaidExpansionPolicyRegression;
+
+export const getNeedFundingScatterSummary = (year: FinancingYear): NeedFundingScatterSummary => {
+  const points = getStateFinancingByYear(year)
+    .map((record) => ({
+      state: record.state,
+      abbreviation: record.abbreviation,
+      year: record.year,
+      need_index: record.need_index,
+      public_mh_spending_per_capita: record.public_mh_spending_per_capita,
+      predicted_public_mh_spending_per_capita: record.predicted_public_mh_spending_per_capita,
+      funding_gap_per_capita: record.funding_gap_per_capita,
+      funding_gap_score: record.funding_gap_score,
+    }))
+    .sort((left, right) => left.abbreviation.localeCompare(right.abbreviation));
+  const regression = getNeedFundingRegression(year);
+  const needValues = points.map((point) => point.need_index);
+  const minNeedValue = Math.min(...needValues);
+  const maxNeedValue = Math.max(...needValues);
+
+  return {
+    points,
+    line: [minNeedValue, maxNeedValue].map((needIndex) => ({
+      need_index: needIndex,
+      predicted_public_mh_spending_per_capita: round(regression.intercept + regression.slope * needIndex, 2),
+    })),
+    outliers: [...points]
+      .sort((left, right) => Math.abs(right.funding_gap_score) - Math.abs(left.funding_gap_score))
+      .slice(0, 8),
+  };
+};
+
+export const getGapScoreExportRows = (year: FinancingYear) =>
+  getStateFinancingByYear(year)
+    .map((record) => ({
+      state: record.state,
+      abbreviation: record.abbreviation,
+      year: record.year,
+      need_index: record.need_index,
+      public_mh_spending_per_capita: record.public_mh_spending_per_capita,
+      predicted_public_mh_spending_per_capita: record.predicted_public_mh_spending_per_capita,
+      funding_gap_per_capita: record.funding_gap_per_capita,
+      funding_gap_percent: record.funding_gap_percent,
+      funding_gap_score: record.funding_gap_score,
+      mismatch_index: record.mismatch_index,
+      medicaid_expansion_label: record.medicaid_expansion_label,
+      financing_status: getFinancingProvenanceSummary(record).label,
+    }))
+    .sort((left, right) => left.state.localeCompare(right.state));
+
+export const getPersistentUnderinvestmentExportRows = () =>
+  getPersistentUnderinvestmentStates().map((record) => ({
+    state: record.state,
+    abbreviation: record.abbreviation,
+    average_gap_per_capita: record.average_gap_per_capita,
+    gap_trend_per_year: record.gap_trend_per_year,
+    gap_std_per_capita: record.gap_std_per_capita,
+    negative_gap_years_share: record.negative_gap_years_share,
+    persistent_underfunding: record.persistent_underfunding,
+    latest_gap_per_capita: record.latest_gap_per_capita,
+    latest_need_index: record.latest_need_index,
+    latest_public_mh_spending_per_capita: record.latest_public_mh_spending_per_capita,
+    latest_predicted_public_mh_spending_per_capita: record.latest_predicted_public_mh_spending_per_capita,
+    typology_cluster_label: record.typology_cluster_label,
+  }));
+
+export const getTypologyExportRows = (year: FinancingYear) =>
+  getStateFinancingByYear(year)
+    .map((record) => ({
+      state: record.state,
+      abbreviation: record.abbreviation,
+      year: record.year,
+      typology_cluster_id: record.typology_cluster_id,
+      typology_cluster_label: record.typology_cluster_label,
+      typology_cluster_description: record.typology_cluster_description,
+      typology_cluster_color: record.typology_cluster_color,
+      need_index: record.need_index,
+      public_mh_spending_per_capita: record.public_mh_spending_per_capita,
+      medicaid_share_of_public_mh: record.medicaid_share_of_public_mh,
+      provider_density_per_100k: record.provider_density_per_100k,
+      persistent_underfunding: record.persistent_underfunding,
+    }))
+    .sort((left, right) => left.state.localeCompare(right.state));

@@ -14,9 +14,11 @@ import {
   AreaChart,
   Area,
   ScatterChart,
+  ComposedChart,
   Scatter,
   ReferenceLine,
   Cell,
+  LabelList,
 } from "recharts";
 import { TrendingUp, Users, Heart, AlertCircle, Map } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -28,14 +30,18 @@ import {
   getExpansionEventTrend,
   getExpansionMismatchDistribution,
   getExpansionMismatchTrend,
+  getGapScoreExportRows,
   getFinancingProvenanceSummary,
   getMedicaidExpansionPolicyRegression,
   getNationalFinancingTrend,
   getNeedFundingRegression,
+  getNeedFundingScatterSummary,
   getPersistentUnderfundingThreshold,
+  getPersistentUnderinvestmentExportRows,
   getPersistentUnderinvestmentStates,
   getStateExpansionTrend,
   getStateFinancingByYear,
+  getTypologyExportRows,
   getTypologySummaryByYear,
 } from "@/data/stateFinancingData";
 import { citationLinks, metricProvenance } from "@shared/dataProvenance";
@@ -114,6 +120,7 @@ export default function Home() {
     .sort((a, b) => b.public_mh_spending_per_capita - a.public_mh_spending_per_capita)
     .slice(0, 12);
   const latestNeedFundingRegression = getNeedFundingRegression(latestFinancingYear);
+  const latestNeedFundingScatter = getNeedFundingScatterSummary(latestFinancingYear);
   const persistentUnderinvestmentThreshold = getPersistentUnderfundingThreshold();
   const persistentUnderinvestmentStates = getPersistentUnderinvestmentStates().slice(0, 10);
   const latestTypologySummary = getTypologySummaryByYear(latestFinancingYear);
@@ -134,6 +141,30 @@ export default function Home() {
     },
     { total: 0, official_urs: 0, official_cms_mhbg: 0, mixed_official: 0, modeled: 0 }
   );
+  const downloadCsv = (filename: string, rows: Array<Record<string, unknown>>) => {
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0]);
+    const escapeCell = (value: unknown) => {
+      const normalized =
+        value === null || value === undefined
+          ? ""
+          : typeof value === "number" || typeof value === "boolean"
+            ? String(value)
+            : String(value);
+      const escaped = normalized.replace(/"/g, '""');
+      return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+    };
+    const csv = [headers.join(","), ...rows.map((row) => headers.map((header) => escapeCell(row[header])).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
   const CORE_METRIC_TO_TREND_KEY = {
     ami: "ami",
     smi: "smi",
@@ -651,6 +682,14 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => downloadCsv(`gap-scores-${latestFinancingYear}.csv`, getGapScoreExportRows(latestFinancingYear))}
+                      className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800"
+                    >
+                      Download gap scores CSV
+                    </button>
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div className="rounded-lg bg-blue-50 p-4">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">Slope</p>
@@ -692,6 +731,65 @@ export default function Home() {
                       <Bar dataKey="latest_gap_per_capita" fill="#1d4ed8" name="Latest Gap per Capita" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                  <div className="rounded-lg border p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-1">
+                      Need Index vs Public Mental Health Spending per Capita
+                    </h3>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      The regression line shows expected funding given need in {latestFinancingYear}. Labeled states are the largest positive or negative outliers relative to that line.
+                    </p>
+                    <ResponsiveContainer width="100%" height={340}>
+                      <ComposedChart margin={{ top: 10, right: 25, left: 0, bottom: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis type="number" dataKey="need_index" stroke="#6b7280" name="Need Index" />
+                        <YAxis
+                          type="number"
+                          dataKey="public_mh_spending_per_capita"
+                          stroke="#6b7280"
+                          name="Public MH Spending per Capita"
+                        />
+                        <Tooltip
+                          cursor={{ strokeDasharray: "4 4" }}
+                          contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                          labelFormatter={(_label: unknown, payload: any[]) =>
+                            payload?.[0]?.payload
+                              ? `${payload[0].payload.state} (${payload[0].payload.abbreviation})`
+                              : ""
+                          }
+                          formatter={(value: number, name: string) => [
+                            name === "public_mh_spending_per_capita" ? `$${value}` : value,
+                            name === "public_mh_spending_per_capita" ? "Actual spending per capita" : "Predicted spending per capita",
+                          ]}
+                        />
+                        <Legend />
+                        <Scatter data={latestNeedFundingScatter.points} name="States">
+                          {latestNeedFundingScatter.points.map((point) => (
+                            <Cell
+                              key={`${point.abbreviation}-${point.year}`}
+                              fill={point.funding_gap_score >= 0 ? "#0f766e" : "#dc2626"}
+                            />
+                          ))}
+                        </Scatter>
+                        <Scatter
+                          data={latestNeedFundingScatter.outliers}
+                          name="Labeled outliers"
+                          fill="#1d4ed8"
+                        >
+                          <LabelList dataKey="abbreviation" position="top" />
+                        </Scatter>
+                        <Line
+                          type="linear"
+                          data={latestNeedFundingScatter.line}
+                          dataKey="predicted_public_mh_spending_per_capita"
+                          stroke="#1d4ed8"
+                          strokeWidth={2.5}
+                          dot={false}
+                          legendType="line"
+                          name="Regression line"
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -703,6 +801,14 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => downloadCsv("persistent-underinvestment.csv", getPersistentUnderinvestmentExportRows())}
+                      className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800"
+                    >
+                      Download persistence CSV
+                    </button>
+                  </div>
                   <div className="space-y-3">
                     {persistentUnderinvestmentStates.map((state, index) => (
                       <div key={state.abbreviation} className="flex items-center justify-between rounded-lg border p-4">
@@ -732,6 +838,14 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => downloadCsv(`typology-${latestFinancingYear}.csv`, getTypologyExportRows(latestFinancingYear))}
+                      className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800"
+                    >
+                      Download typology CSV
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {latestTypologySummary.map((cluster) => (
                       <div key={cluster.clusterId} className="rounded-lg border p-4">
