@@ -311,6 +311,8 @@ export default function Home() {
     if (seriesKey === "OTH") return "#94a3b8";
     return `hsl(${(index * 37) % 360}, 65%, 50%)`;
   };
+  const formatRatePer100 = (value: number) => `${value.toFixed(1)} per 100 people`;
+  const formatRatePer100k = (value: number) => `${value.toFixed(1)} per 100,000`;
   const disorderKeys = [
     "mde_adult",
     "anxiety_disorder",
@@ -512,7 +514,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>Any Mental Illness: State-Stacked Trend Over Time</CardTitle>
                 <CardDescription>
-                  Stacked state-colored trend view (top 10 states + others) from 2004 to 2024.
+                  Stacked state-colored rate view (top 10 states + others) from 2004 to 2024. Values are rates per 100 people, not shares that sum to 100.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -523,7 +525,7 @@ export default function Home() {
                     <YAxis stroke="#6b7280" />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                      formatter={(value: number, name: string) => [`${value}%`, amiStateTrend.labels[name] ?? name]}
+                      formatter={(value: number, name: string) => [formatRatePer100(value), amiStateTrend.labels[name] ?? name]}
                     />
                     <Legend formatter={(value) => amiStateTrend.labels[value] ?? value} />
                     {amiStateTrend.series.map((seriesKey, idx) => (
@@ -541,7 +543,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>Serious Mental Illness: State-Stacked Trend Over Time</CardTitle>
                 <CardDescription>
-                  Stacked state-colored trend view (top 10 states + others) from 2004 to 2024.
+                  Stacked state-colored rate view (top 10 states + others) from 2004 to 2024. Values are rates per 100 people, not shares that sum to 100.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -552,7 +554,7 @@ export default function Home() {
                     <YAxis stroke="#6b7280" />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                      formatter={(value: number, name: string) => [`${value}%`, smiStateTrend.labels[name] ?? name]}
+                      formatter={(value: number, name: string) => [formatRatePer100(value), smiStateTrend.labels[name] ?? name]}
                     />
                     <Legend formatter={(value) => smiStateTrend.labels[value] ?? value} />
                     {smiStateTrend.series.map((seriesKey, idx) => (
@@ -570,7 +572,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>Youth Depression: State-Stacked Trend Over Time</CardTitle>
                 <CardDescription>
-                  Stacked state-colored trend view (top 10 states + others) from 2004 to 2024.
+                  Stacked state-colored rate view (top 10 states + others) from 2004 to 2024. Values are rates per 100 people, not shares that sum to 100.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -581,7 +583,7 @@ export default function Home() {
                     <YAxis stroke="#6b7280" />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                      formatter={(value: number, name: string) => [`${value}%`, youthStateTrend.labels[name] ?? name]}
+                      formatter={(value: number, name: string) => [formatRatePer100(value), youthStateTrend.labels[name] ?? name]}
                     />
                     <Legend formatter={(value) => youthStateTrend.labels[value] ?? value} />
                     {youthStateTrend.series.map((seriesKey, idx) => (
@@ -599,7 +601,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>Suicide Rate: State-Stacked Trend Over Time</CardTitle>
                 <CardDescription>
-                  Stacked state-colored trend view (top 10 states + others) from 2004 to 2024.
+                  Stacked state-colored rate view (top 10 states + others) from 2004 to 2024. Values are deaths per 100,000 people, not shares of a whole.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -610,7 +612,7 @@ export default function Home() {
                     <YAxis stroke="#6b7280" />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                      formatter={(value: number, name: string) => [`${value}`, suicideStateTrend.labels[name] ?? name]}
+                      formatter={(value: number, name: string) => [formatRatePer100k(value), suicideStateTrend.labels[name] ?? name]}
                     />
                     <Legend formatter={(value) => suicideStateTrend.labels[value] ?? value} />
                     {suicideStateTrend.series.map((seriesKey, idx) => (
@@ -628,7 +630,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>Psychiatric Disorders: Stacked Trend Over Time</CardTitle>
                 <CardDescription>
-                  Stacked over-time trend of disorder prevalence across the United States.
+                  Stacked over-time disorder rate view across the United States. Values are rates per 100 people, so the stacked total is a comparative visualization rather than a 100% composition.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -639,7 +641,7 @@ export default function Home() {
                     <YAxis stroke="#6b7280" />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                      formatter={(value: number, name: string) => [`${value}%`, disorderLabels[name as keyof typeof disorderLabels] ?? name]}
+                      formatter={(value: number, name: string) => [formatRatePer100(value), disorderLabels[name as keyof typeof disorderLabels] ?? name]}
                     />
                     <Legend formatter={(value) => disorderLabels[value as keyof typeof disorderLabels] ?? value} />
                     {disorderKeys.map((key) => (

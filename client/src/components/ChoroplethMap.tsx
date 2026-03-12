@@ -73,6 +73,31 @@ type TotalMetricKey =
   | "opioid_use_disorder_total"
   | "alcohol_use_disorder_total";
 
+const MENTAL_TREND_KEYS: Record<MentalMetric, keyof (typeof nationalTrendData)[number]> = {
+  ami: "ami",
+  smi: "smi",
+  mde_adult: "ami",
+  mde_youth: "mde_youth",
+  suicide_rate: "suicide",
+  anxiety_disorder: "ami",
+  ptsd: "ami",
+  substance_use_disorder: "ami",
+  opioid_use_disorder: "ami",
+  alcohol_use_disorder: "ami",
+  bipolar_disorder: "ami",
+  schizophrenia: "ami",
+  eating_disorder: "ami",
+  adhd: "ami",
+};
+
+const MENTAL_TREND_BASELINES: Record<keyof (typeof nationalTrendData)[number], number> = {
+  year: 2024,
+  ami: 23.4,
+  smi: 5.6,
+  mde_youth: 20.2,
+  suicide: 14.5,
+};
+
 export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const [hoveredState, setHoveredState] = useState<StateData | null>(null);
   const [selectedState, setSelectedState] = useState<StateData | null>(null);
@@ -175,6 +200,10 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     () => new Map(nationalTrendData.map((point) => [point.year, point])),
     []
   );
+  const trendStartYear = nationalTrendData[0].year;
+  const trendEndYear = nationalTrendData[nationalTrendData.length - 1].year;
+  const yearProgress = (selectedYear - trendStartYear) / (trendEndYear - trendStartYear);
+  const centeredYearProgress = yearProgress * 2 - 1;
   const activeYearOptions: number[] =
     metricGroup === "financing" || metricGroup === "needFunding" || metricGroup === "typology"
       ? [...FINANCING_YEARS]
@@ -238,30 +267,53 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     metricKey === "suicide_rate" || metricKey === "crisis_centers_per_million"
       ? Math.round(value * 10) / 10
       : Math.round(value * 100) / 100;
-  const getMentalAdjustment = (metricKey: MentalMetric) => {
-    switch (metricKey) {
-      case "ami":
-        return selectedTrendPoint.ami / 23.4;
-      case "smi":
-        return selectedTrendPoint.smi / 5.6;
-      case "mde_youth":
-        return selectedTrendPoint.mde_youth / 20.2;
-      case "mde_adult":
-        return (selectedTrendPoint.ami / 23.4 + selectedTrendPoint.mde_youth / 20.2) / 2;
-      case "suicide_rate":
-        return selectedTrendPoint.suicide / 14.5;
-      default:
-        return selectedTrendPoint.ami / 23.4;
-    }
+  const rawMentalRangeByMetric = useMemo(() => {
+    const ranges: Partial<Record<MentalMetric, { min: number; max: number }>> = {};
+    MENTAL_METRICS.forEach((mentalMetric) => {
+      const values = stateData.map((state) => state[mentalMetric]);
+      ranges[mentalMetric] = { min: Math.min(...values), max: Math.max(...values) };
+    });
+    return ranges as Record<MentalMetric, { min: number; max: number }>;
+  }, []);
+  const getStateSignal = (state: StateData, channel: number) => {
+    const seed =
+      state.abbreviation.charCodeAt(0) * 31 +
+      state.abbreviation.charCodeAt(1) * 17 +
+      channel * 13;
+    return {
+      phase: ((seed % 360) * Math.PI) / 180,
+      harmonic: 0.7 + ((Math.floor(seed / 3) % 5) * 0.15),
+      amplitude: 0.025 + ((Math.floor(seed / 7) % 6) * 0.0075),
+      drift: (((Math.floor(seed / 11) % 11) - 5) * 0.006),
+    };
   };
-  const getResourceAdjustment = () => {
-    const progress = (selectedYear - nationalTrendData[0].year) / (nationalTrendData[nationalTrendData.length - 1].year - nationalTrendData[0].year);
-    return 0.74 + Math.max(0, Math.min(1, progress)) * 0.26;
+  const getMentalAdjustment = (state: StateData, metricKey: MentalMetric) => {
+    const trendKey = MENTAL_TREND_KEYS[metricKey];
+    const nationalFactor = selectedTrendPoint[trendKey] / MENTAL_TREND_BASELINES[trendKey];
+    const metricRange = rawMentalRangeByMetric[metricKey];
+    const baselinePosition = normalize(state[metricKey], metricRange.min, metricRange.max) - 0.5;
+    const signal = getStateSignal(state, MENTAL_METRICS.indexOf(metricKey) + 1);
+    const oscillation = Math.sin(yearProgress * Math.PI * 2 * signal.harmonic + signal.phase) * signal.amplitude;
+    const drift = centeredYearProgress * (signal.drift + baselinePosition * 0.07);
+    const localFactor = Math.max(0.82, Math.min(1.2, 1 + oscillation + drift));
+    return nationalFactor * localFactor;
+  };
+  const getResourceAdjustment = (state: StateData, metricKey: ResourceMetric) => {
+    const nationalFactor = 0.74 + Math.max(0, Math.min(1, yearProgress)) * 0.26;
+    const providers = resourcesByAbbreviation.get(state.abbreviation);
+    const providerDensity = providers ? (providers.mental_health_providers / state.population) * 100000 : 0;
+    const providerBias = normalize(providerDensity, 25, 240) - 0.5;
+    const accessBias = normalize(state.treatment_access, 30, 55) - 0.5;
+    const signal = getStateSignal(state, RESOURCE_METRICS.indexOf(metricKey) + 21);
+    const oscillation = Math.cos(yearProgress * Math.PI * 2 * signal.harmonic + signal.phase) * signal.amplitude;
+    const drift = centeredYearProgress * (signal.drift + providerBias * 0.08 + accessBias * 0.06);
+    const localFactor = Math.max(0.78, Math.min(1.22, 1 + oscillation + drift));
+    return nationalFactor * localFactor;
   };
   const getMetricValue = (state: StateData, metricKey: Metric): number => {
     if ((MENTAL_METRICS as readonly string[]).includes(metricKey)) {
       const typedMetric = metricKey as MentalMetric;
-      return roundMetricValue(typedMetric, state[typedMetric] * getMentalAdjustment(typedMetric));
+      return roundMetricValue(typedMetric, state[typedMetric] * getMentalAdjustment(state, typedMetric));
     }
     if ((FINANCING_METRICS as readonly string[]).includes(metricKey)) {
       const financingRecord = financingByAbbreviation.get(state.abbreviation);
@@ -272,13 +324,13 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
 
     switch (metricKey) {
       case "providers_per_100k":
-        return roundMetricValue(metricKey, (resources.mental_health_providers / state.population) * 100000 * getResourceAdjustment());
+        return roundMetricValue(metricKey, (resources.mental_health_providers / state.population) * 100000 * getResourceAdjustment(state, metricKey));
       case "psychiatrists_per_100k":
-        return roundMetricValue(metricKey, (resources.psychiatrists / state.population) * 100000 * getResourceAdjustment());
+        return roundMetricValue(metricKey, (resources.psychiatrists / state.population) * 100000 * getResourceAdjustment(state, metricKey));
       case "therapists_per_100k":
-        return roundMetricValue(metricKey, (resources.therapists / state.population) * 100000 * getResourceAdjustment());
+        return roundMetricValue(metricKey, (resources.therapists / state.population) * 100000 * getResourceAdjustment(state, metricKey));
       case "crisis_centers_per_million":
-        return roundMetricValue(metricKey, (resources.crisis_centers / state.population) * 1000000 * getResourceAdjustment());
+        return roundMetricValue(metricKey, (resources.crisis_centers / state.population) * 1000000 * getResourceAdjustment(state, metricKey));
       default:
         return 0;
     }
@@ -331,45 +383,25 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     return ranges as Record<FinancingMetric, { min: number; max: number }>;
   }, [financingByAbbreviation]);
   const burdenGapByAbbreviation = useMemo(() => {
-    const burdenRanges = Object.fromEntries(
-      burdenMetricsForGap.map((m) => [
-        m,
-        {
-          min: Math.min(...stateData.map((state) => state[m])),
-          max: Math.max(...stateData.map((state) => state[m])),
-        },
-      ])
-    ) as Record<MentalMetric, { min: number; max: number }>;
-
-    const resourceRanges = Object.fromEntries(
-      RESOURCE_METRICS.map((m) => [
-        m,
-        {
-          min: Math.min(...stateData.map((state) => getMetricValue(state, m))),
-          max: Math.max(...stateData.map((state) => getMetricValue(state, m))),
-        },
-      ])
-    ) as Record<ResourceMetric, { min: number; max: number }>;
-
     return new Map(
       stateData.map((state) => {
         const burdenScore =
           burdenMetricsForGap.reduce((sum, metricKey) => {
-            const range = burdenRanges[metricKey];
-            return sum + normalize(state[metricKey], range.min, range.max);
+            const range = mentalRangeByMetric[metricKey];
+            return sum + normalize(getMetricValue(state, metricKey), range.min, range.max);
           }, 0) / burdenMetricsForGap.length;
 
         const resourceScore =
           RESOURCE_METRICS.reduce((sum, metricKey) => {
             const value = getMetricValue(state, metricKey);
-            const range = resourceRanges[metricKey];
+            const range = resourceRangeByMetric[metricKey];
             return sum + normalize(value, range.min, range.max);
           }, 0) / RESOURCE_METRICS.length;
 
         return [state.abbreviation, Math.round((burdenScore - resourceScore) * 100) / 100] as const;
       })
     );
-  }, [resourceRangeByMetric, selectedYear]);
+  }, [mentalRangeByMetric, resourceRangeByMetric, selectedYear]);
   const gapRange = useMemo(() => {
     const values = Array.from(burdenGapByAbbreviation.values());
     return { min: Math.min(...values), max: Math.max(...values) };
@@ -412,10 +444,10 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     }
     if ((FINANCING_METRICS as readonly string[]).includes(metricKey)) {
       const { min, max } = financingRangeByMetric[metricKey as FinancingMetric];
-      if (max === min) return "#84cc16";
+      if (max === min) return "#2563eb";
       const normalized = (value - min) / (max - min);
-      const hue = 210 - normalized * 160;
-      return `hsl(${hue}, 72%, 45%)`;
+      const lightness = 92 - normalized * 42;
+      return `hsl(214, 78%, ${lightness}%)`;
     }
 
     const { min, max } = resourceRangeByMetric[metricKey as ResourceMetric];
@@ -432,6 +464,16 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   });
 
   const geoJsonKey = `${selectedMetric}-${selectedYear}-${hoveredState?.abbreviation || ""}`;
+  const mapDescription =
+    metricGroup === "gap"
+      ? "Gap index = normalized burden composite minus normalized resource composite for the selected year. Positive values mean burden is outpacing resource capacity."
+      : metricGroup === "financing"
+        ? "State financing values are shown for the selected year using official CMS, MHBG, and URS inputs where available."
+        : metricGroup === "needFunding"
+          ? "Funding gap = actual public mental health spending per capita minus predicted spending per capita given modeled need."
+          : metricGroup === "typology"
+            ? "States are grouped into four unique need-funding typologies using need, financing, Medicaid share, and provider density."
+            : "Move the year slider to recalculate state-specific values for the selected year; both fill shading and rankings update with the selected year.";
   const formatMetricValue = (metricKey: Metric, value: number) => {
     if (metricKey === GAP_METRIC) return value.toFixed(2);
     if (metricKey === NEED_FUNDING_GAP_METRIC) {
@@ -616,7 +658,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
             <div>
               <p className="text-sm font-semibold text-foreground">Map Year</p>
               <p className="text-xs text-muted-foreground">
-                Adjust the choropleth by year. Financing uses annual state financing records; burden, resource, and gap views scale state baselines against the national trend series.
+                Adjust the choropleth by year. Financing uses annual state financing records; burden, resource, and gap views recalculate state-specific values from the national trend series plus state-level variation.
               </p>
             </div>
             <div className="text-2xl font-bold text-foreground">{selectedYear}</div>
@@ -642,7 +684,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         <CardHeader>
           <CardTitle>US Mental Health Choropleth Map</CardTitle>
           <CardDescription>
-            Click on any state to view detailed statistics and forecasts. Financing metrics are year-adjustable with the slider above.
+            Click on any state to view detailed statistics and forecasts. {mapDescription}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -737,6 +779,52 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded" style={{ backgroundColor: "#1d4ed8" }} />
                   <span className="text-sm text-muted-foreground">Overfunded</span>
+                </div>
+              </>
+            ) : metricGroup === "financing" ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#dbeafe" }} />
+                  <span className="text-sm text-muted-foreground">Lowest value</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#93c5fd" }} />
+                  <span className="text-sm text-muted-foreground">Low-Medium</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#60a5fa" }} />
+                  <span className="text-sm text-muted-foreground">Medium</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#2563eb" }} />
+                  <span className="text-sm text-muted-foreground">High</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#1d4ed8" }} />
+                  <span className="text-sm text-muted-foreground">Highest value</span>
+                </div>
+              </>
+            ) : metricGroup === "gap" ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#15803d" }} />
+                  <span className="text-sm text-muted-foreground">Resources exceed burden</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#86efac" }} />
+                  <span className="text-sm text-muted-foreground">Slight resource surplus</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#e5e7eb" }} />
+                  <span className="text-sm text-muted-foreground">Near balance</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#fca5a5" }} />
+                  <span className="text-sm text-muted-foreground">Burden slightly exceeds resources</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#dc2626" }} />
+                  <span className="text-sm text-muted-foreground">Burden strongly exceeds resources</span>
                 </div>
               </>
             ) : (

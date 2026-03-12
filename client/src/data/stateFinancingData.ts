@@ -578,16 +578,48 @@ const buildTypologyForYear = (year: FinancingYear) => {
     if (stable) break;
   }
 
-  const clusterMeta = centroids.map((centroid, clusterId) => {
-    const highNeed = centroid[0] >= 0.5;
-    const highFunding = centroid[1] >= 0.5;
-    const label: TypologyLabel = highNeed
-      ? highFunding
-        ? "High need / high funding"
-        : "High need / low funding"
-      : highFunding
-        ? "Low need / high funding"
-        : "Low need / low funding";
+  const pickCluster = (score: (centroid: number[]) => number, excluded: Set<number>) => {
+    let bestCluster = -1;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    centroids.forEach((centroid, clusterId) => {
+      if (excluded.has(clusterId)) return;
+      const nextScore = score(centroid);
+      if (nextScore > bestScore) {
+        bestScore = nextScore;
+        bestCluster = clusterId;
+      }
+    });
+    return bestCluster;
+  };
+
+  const assignedLabels = new Map<number, TypologyLabel>();
+  const usedClusters = new Set<number>();
+
+  const highNeedLowFundingCluster = pickCluster((centroid) => centroid[0] - centroid[1], usedClusters);
+  if (highNeedLowFundingCluster >= 0) {
+    assignedLabels.set(highNeedLowFundingCluster, "High need / low funding");
+    usedClusters.add(highNeedLowFundingCluster);
+  }
+
+  const highNeedHighFundingCluster = pickCluster((centroid) => centroid[0] + centroid[1], usedClusters);
+  if (highNeedHighFundingCluster >= 0) {
+    assignedLabels.set(highNeedHighFundingCluster, "High need / high funding");
+    usedClusters.add(highNeedHighFundingCluster);
+  }
+
+  const lowNeedHighFundingCluster = pickCluster((centroid) => centroid[1] - centroid[0], usedClusters);
+  if (lowNeedHighFundingCluster >= 0) {
+    assignedLabels.set(lowNeedHighFundingCluster, "Low need / high funding");
+    usedClusters.add(lowNeedHighFundingCluster);
+  }
+
+  const lowNeedLowFundingCluster = pickCluster((centroid) => -centroid[0] - centroid[1], usedClusters);
+  if (lowNeedLowFundingCluster >= 0) {
+    assignedLabels.set(lowNeedLowFundingCluster, "Low need / low funding");
+  }
+
+  const clusterMeta = centroids.map((_, clusterId) => {
+    const label = assignedLabels.get(clusterId) ?? "Low need / low funding";
 
     return {
       clusterId,
@@ -673,6 +705,13 @@ export const getTypologySummaryByYear = (year: FinancingYear): TypologyClusterSu
     counts.set(record.typology_cluster_id, [...(counts.get(record.typology_cluster_id) ?? []), record.abbreviation]);
   });
 
+  const labelOrder: TypologyLabel[] = [
+    "High need / low funding",
+    "High need / high funding",
+    "Low need / low funding",
+    "Low need / high funding",
+  ];
+
   return Array.from(counts.entries())
     .map(([clusterId, states]) => {
       const sample = rows.find((record) => record.typology_cluster_id === clusterId)!;
@@ -686,7 +725,7 @@ export const getTypologySummaryByYear = (year: FinancingYear): TypologyClusterSu
         states: states.sort(),
       };
     })
-    .sort((left, right) => left.label.localeCompare(right.label));
+    .sort((left, right) => labelOrder.indexOf(left.label) - labelOrder.indexOf(right.label));
 };
 
 export const getFinancingProvenanceSummary = (record: StateFinancingRecord): FinancingProvenanceSummary => {
