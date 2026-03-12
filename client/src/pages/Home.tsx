@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import ChoroplethMap from "@/components/ChoroplethMap";
 import CountryChoroplethMap from "@/components/CountryChoroplethMap";
 import { getStateResources, stateData } from "@/data/stateData";
+import { FINANCING_YEARS, getNationalFinancingTrend, getStateFinancingByYear } from "@/data/stateFinancingData";
 import { citationLinks, metricProvenance } from "@shared/dataProvenance";
 
 // Mental health trend data from 2004-2024
@@ -91,6 +92,11 @@ export default function Home() {
     })
     .filter(Boolean)
     .sort((a, b) => (b?.providers_per_100k ?? 0) - (a?.providers_per_100k ?? 0))
+    .slice(0, 12);
+  const latestFinancingYear = FINANCING_YEARS[FINANCING_YEARS.length - 1];
+  const nationalFinancingTrend = getNationalFinancingTrend();
+  const latestFinancingStates = getStateFinancingByYear(latestFinancingYear)
+    .sort((a, b) => b.public_mh_spending_per_capita - a.public_mh_spending_per_capita)
     .slice(0, 12);
   const CORE_METRIC_TO_TREND_KEY = {
     ami: "ami",
@@ -305,12 +311,12 @@ export default function Home() {
             Explore how mental health indicators have evolved in the United States from 2004 to 2024.
           </p>
           <p className="text-sm text-muted-foreground mt-3">
-            National trend lines are aligned to official U.S. sources listed below. State AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, opioid use disorder, suicide mortality, and resource availability now use official federal source files; country comparisons, burden-resource gap scoring, and the remaining disorder layers are still mixed or modeled.
+            National trend lines are aligned to official U.S. sources listed below. State AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, opioid use disorder, suicide mortality, and resource availability now use official federal source files; the new financing layer combines SAMHSA MHBG, URS, CMS Medicaid expenditure reporting, and KFF policy context into an annual state comparison view. Country comparisons, burden-resource gap scoring, and the remaining disorder layers are still mixed or modeled.
           </p>
         </div>
 
         <Tabs defaultValue="geographic" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-muted p-1 rounded-lg">
+          <TabsList className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg h-auto">
             <TabsTrigger value="geographic" className="text-xs md:text-sm">
               <Map className="w-4 h-4 mr-1" /> Geographic
             </TabsTrigger>
@@ -328,6 +334,9 @@ export default function Home() {
             </TabsTrigger>
             <TabsTrigger value="disorders" className="text-xs md:text-sm">
               Disorders
+            </TabsTrigger>
+            <TabsTrigger value="financing" className="text-xs md:text-sm">
+              Financing
             </TabsTrigger>
           </TabsList>
 
@@ -502,6 +511,72 @@ export default function Home() {
                 </button>
               </div>
               {geoScope === "states" ? <ChoroplethMap metric="ami" /> : <CountryChoroplethMap metric="ami" />}
+            </div>
+          </TabsContent>
+
+          {/* Mental Health Financing */}
+          <TabsContent value="financing">
+            <div className="space-y-6">
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle>Mental Health and Medicaid Financing Trends</CardTitle>
+                  <CardDescription>
+                    Annual national context for SAMHSA block grant flows, broader federal mental health funding, state public mental health spending, and Medicaid financing environment.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={420}>
+                    <LineChart data={nationalFinancingTrend} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="year" stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "medicaid_total_expenditures_billions") return [`$${value}B`, "Medicaid Expenditures"];
+                          if (name === "medicaid_share_of_public_mh") return [`${value}%`, "Avg Medicaid Share of Public MH"];
+                          return [`$${Number(value).toLocaleString()}M`, name === "mhbg_allotment_millions" ? "MHBG Allotment" : name === "federal_mental_health_funding_millions" ? "Federal Mental Health Funding" : "Public MH Spending"];
+                        }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="mhbg_allotment_millions" stroke="#2563eb" strokeWidth={2.5} name="MHBG Allotment" dot={false} />
+                      <Line type="monotone" dataKey="federal_mental_health_funding_millions" stroke="#1d4ed8" strokeWidth={2.5} name="Federal Mental Health Funding" dot={false} />
+                      <Line type="monotone" dataKey="public_mh_spending_millions" stroke="#0f766e" strokeWidth={2.5} name="Public MH Spending" dot={false} />
+                      <Line type="monotone" dataKey="medicaid_total_expenditures_billions" stroke="#0e7490" strokeWidth={2.5} name="Medicaid Expenditures (B)" dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle>{latestFinancingYear} State Financing Mix</CardTitle>
+                  <CardDescription>
+                    Top states by public mental health spending per capita, with financing composition split across Medicaid, state funds, other federal sources, and local/other sources.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={460}>
+                    <BarChart data={latestFinancingStates} margin={{ top: 5, right: 30, left: 0, bottom: 40 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="abbreviation" stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "public_mh_spending_per_capita") return [`$${value}`, "Public MH Spending per Capita"];
+                          return [`${value}%`, name];
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="medicaid_share_of_public_mh" stackId="funding" fill="#0f766e" name="Medicaid Share" />
+                      <Bar dataKey="state_share_of_public_mh" stackId="funding" fill="#2563eb" name="State Share" />
+                      <Bar dataKey="other_federal_share_of_public_mh" stackId="funding" fill="#7c3aed" name="Other Federal Share" />
+                      <Bar dataKey="local_other_share_of_public_mh" stackId="funding" fill="#94a3b8" name="Local / Other Share" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>
@@ -679,7 +754,7 @@ export default function Home() {
               </div>
             ))}
             <p className="text-sm text-muted-foreground">
-              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
+              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS; and the financing layer combines SAMHSA MHBG, SAMHSA URS, CMS Medicaid expenditure reporting, and KFF policy context into a harmonized state-year comparison view. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
             </p>
             <div className="pt-2">
               <h4 className="font-semibold text-foreground mb-3">Metric Provenance Status</h4>

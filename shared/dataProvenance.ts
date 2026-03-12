@@ -64,6 +64,36 @@ export const citationLinks: CitationLink[] = [
     description:
       "Official CDC/NCHS mortality source for state suicide rates and related death measures.",
   },
+  {
+    title: "SAMHSA Community Mental Health Services Block Grant",
+    href: "https://www.samhsa.gov/grants/block-grants/mhbg",
+    description:
+      "Primary federal block grant source for state and territory mental health allotments and annual MHBG program structure.",
+  },
+  {
+    title: "SAMHSA Uniform Reporting System (URS) Output Tables",
+    href: "https://www.samhsa.gov/data/evaluation-management-reporting/data/urs-output-tables",
+    description:
+      "Annual state mental health authority reporting framework used to characterize public mental health system financing and service-system context.",
+  },
+  {
+    title: "CMS State Budget & Expenditure Reporting for Medicaid and CHIP",
+    href: "https://www.medicaid.gov/medicaid/financial-management/state-expenditure-reporting-medicaid-chip",
+    description:
+      "Official CMS MBES/CBES and CMS-64 reporting context for state Medicaid expenditure and financing flows.",
+  },
+  {
+    title: "KFF Medicaid Budget Survey Archives",
+    href: "https://www.kff.org/medicaid/50-state-medicaid-budget-survey-archives/",
+    description:
+      "Annual survey archive used for contextual interpretation of state Medicaid spending, enrollment, and policy changes.",
+  },
+  {
+    title: "KFF Medicaid Coverage of Behavioral Health Services in 2022",
+    href: "https://www.kff.org/mental-health/medicaid-coverage-of-behavioral-health-services-in-2022-findings-from-a-survey-of-state-medicaid-programs/",
+    description:
+      "Behavioral health service coverage survey used as policy-context supplementation for state Medicaid behavioral health environments.",
+  },
 ];
 
 export const metricProvenance: MetricProvenance[] = [
@@ -186,5 +216,19 @@ export const metricProvenance: MetricProvenance[] = [
     status: "Integrated from HRSA AHRF workforce files and SAMHSA N-SUMHSS 2024 facility data.",
     notes: "Psychiatrists are aggregated from official AHRF county psychiatry counts; therapist and provider totals are derived from official HRSA mental health workforce fields; crisis-capable facility counts are derived from official SAMHSA crisis-service flags.",
     sources: ["HRSA Area Health Resources Files", "SAMHSA N-SUMHSS state profiles"],
+  },
+  {
+    metric: "mental_health_financing",
+    label: "Mental Health Financing",
+    tier: "mixed",
+    status: "Integrated as a source-aligned multi-dataset financing layer with annual state views from 2016-2024.",
+    notes: "The financing dashboard combines the SAMHSA MHBG program structure, SAMHSA URS reporting concepts, CMS Medicaid expenditure reporting concepts, and KFF policy context into a harmonized state-year comparison layer. This version is source-aligned and method-driven, but not yet a raw-file ETL of every federal award and expenditure table.",
+    sources: [
+      "SAMHSA Community Mental Health Services Block Grant",
+      "SAMHSA Uniform Reporting System (URS) Output Tables",
+      "CMS State Budget & Expenditure Reporting for Medicaid and CHIP",
+      "KFF Medicaid Budget Survey Archives",
+      "KFF Medicaid Coverage of Behavioral Health Services in 2022",
+    ],
   },
 ];

@@ -3,10 +3,22 @@ import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
 import { stateData, generateForecast, getStateResources, getMetricColor, StateData } from "@/data/stateData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { Phone, MessageCircle, TrendingUp } from "lucide-react";
 import { feature } from "topojson-client";
 import usAtlas from "us-atlas/states-10m.json";
+import {
+  FINANCING_METRICS,
+  FINANCING_YEARS,
+  FinancingMetric,
+  FinancingYear,
+  financingMetricLabels,
+  getFinancingMetricValue,
+  getStateFinancingByYear,
+  getStateFinancingRecord,
+  getNationalFinancingTrend,
+} from "@/data/stateFinancingData";
 import "leaflet/dist/leaflet.css";
 
 interface ChoroplethMapProps {
@@ -40,9 +52,10 @@ const GAP_METRIC = "burden_resource_gap" as const;
 
 type MentalMetric = (typeof MENTAL_METRICS)[number];
 type ResourceMetric = (typeof RESOURCE_METRICS)[number];
+type FinancingMetricKey = FinancingMetric;
 type GapMetric = typeof GAP_METRIC;
-type Metric = MentalMetric | ResourceMetric | GapMetric;
-type MetricGroup = "conditions" | "resources" | "gap";
+type Metric = MentalMetric | ResourceMetric | FinancingMetricKey | GapMetric;
+type MetricGroup = "conditions" | "resources" | "financing" | "gap";
 type TotalMetricKey =
   | "ami_total"
   | "smi_total"
@@ -56,8 +69,13 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const [hoveredState, setHoveredState] = useState<StateData | null>(null);
   const [selectedState, setSelectedState] = useState<StateData | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<Metric>(metric);
+  const [selectedYear, setSelectedYear] = useState<FinancingYear>(FINANCING_YEARS[FINANCING_YEARS.length - 1]);
   const [metricGroup, setMetricGroup] = useState<MetricGroup>(
-    (RESOURCE_METRICS as readonly string[]).includes(metric) ? "resources" : "conditions"
+    (RESOURCE_METRICS as readonly string[]).includes(metric)
+      ? "resources"
+      : (FINANCING_METRICS as readonly string[]).includes(metric)
+        ? "financing"
+        : "conditions"
   );
 
   const metricLabels: Record<Metric, string> = {
@@ -79,6 +97,12 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     psychiatrists_per_100k: "Psychiatrists (per 100k)",
     therapists_per_100k: "Therapists (per 100k)",
     crisis_centers_per_million: "Crisis-Capable Facilities (per 1M)",
+    mhbg_per_capita: financingMetricLabels.mhbg_per_capita,
+    federal_mental_health_funding_per_capita: financingMetricLabels.federal_mental_health_funding_per_capita,
+    public_mh_spending_per_capita: financingMetricLabels.public_mh_spending_per_capita,
+    medicaid_expenditure_per_enrollee: financingMetricLabels.medicaid_expenditure_per_enrollee,
+    medicaid_share_of_public_mh: financingMetricLabels.medicaid_share_of_public_mh,
+    behavioral_health_policy_score: financingMetricLabels.behavioral_health_policy_score,
     burden_resource_gap: "Burden-Resource Gap Index",
   };
 
@@ -101,6 +125,12 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     psychiatrists_per_100k: "#0284c7",
     therapists_per_100k: "#06b6d4",
     crisis_centers_per_million: "#0891b2",
+    mhbg_per_capita: "#2563eb",
+    federal_mental_health_funding_per_capita: "#1d4ed8",
+    public_mh_spending_per_capita: "#0f766e",
+    medicaid_expenditure_per_enrollee: "#0e7490",
+    medicaid_share_of_public_mh: "#0f766e",
+    behavioral_health_policy_score: "#7c3aed",
     burden_resource_gap: "#dc2626",
   };
 
@@ -125,9 +155,28 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
       ),
     []
   );
+  const financingByAbbreviation = useMemo(
+    () => new Map(getStateFinancingByYear(selectedYear).map((record) => [record.abbreviation, record])),
+    [selectedYear]
+  );
+  const nationalFinancingTrend = useMemo(() => getNationalFinancingTrend(), []);
+  const selectedFinancingRecord = selectedState
+    ? getStateFinancingRecord(selectedState.abbreviation, selectedYear)
+    : null;
+  const selectedFinancingTrend = useMemo(
+    () =>
+      selectedState
+        ? FINANCING_YEARS.map((year) => getStateFinancingRecord(selectedState.abbreviation, year)).filter(Boolean)
+        : [],
+    [selectedState]
+  );
   const getMetricValue = (state: StateData, metricKey: Metric): number => {
     if ((MENTAL_METRICS as readonly string[]).includes(metricKey)) {
       return state[metricKey as MentalMetric];
+    }
+    if ((FINANCING_METRICS as readonly string[]).includes(metricKey)) {
+      const financingRecord = financingByAbbreviation.get(state.abbreviation);
+      return financingRecord ? getFinancingMetricValue(financingRecord, metricKey as FinancingMetric) : 0;
     }
     const resources = resourcesByAbbreviation.get(state.abbreviation);
     if (!resources) return 0;
@@ -171,6 +220,14 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     });
     return ranges as Record<ResourceMetric, { min: number; max: number }>;
   }, [resourcesByAbbreviation]);
+  const financingRangeByMetric = useMemo(() => {
+    const ranges: Partial<Record<FinancingMetric, { min: number; max: number }>> = {};
+    FINANCING_METRICS.forEach((financingMetric) => {
+      const values = stateData.map((state) => getMetricValue(state, financingMetric));
+      ranges[financingMetric] = { min: Math.min(...values), max: Math.max(...values) };
+    });
+    return ranges as Record<FinancingMetric, { min: number; max: number }>;
+  }, [financingByAbbreviation]);
   const burdenGapByAbbreviation = useMemo(() => {
     const burdenRanges = Object.fromEntries(
       burdenMetricsForGap.map((m) => [
@@ -231,6 +288,13 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     if ((MENTAL_METRICS as readonly string[]).includes(metricKey)) {
       return getMetricColor(metricKey, value);
     }
+    if ((FINANCING_METRICS as readonly string[]).includes(metricKey)) {
+      const { min, max } = financingRangeByMetric[metricKey as FinancingMetric];
+      if (max === min) return "#84cc16";
+      const normalized = (value - min) / (max - min);
+      const hue = 210 - normalized * 160;
+      return `hsl(${hue}, 72%, 45%)`;
+    }
 
     const { min, max } = resourceRangeByMetric[metricKey as ResourceMetric];
     if (max === min) return "#84cc16";
@@ -246,6 +310,24 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   });
 
   const geoJsonKey = `${selectedMetric}-${hoveredState?.abbreviation || ""}`;
+  const formatMetricValue = (metricKey: Metric, value: number) => {
+    if (metricKey === GAP_METRIC) return value.toFixed(2);
+    if (metricKey === "suicide_rate") return value.toFixed(1);
+    if ((MENTAL_METRICS as readonly string[]).includes(metricKey)) return `${value.toFixed(2)}%`;
+    if ((RESOURCE_METRICS as readonly string[]).includes(metricKey)) {
+      return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    }
+    if (metricKey === "medicaid_share_of_public_mh") {
+      return `${value.toFixed(1)}%`;
+    }
+    if (metricKey === "behavioral_health_policy_score") {
+      return value.toFixed(1);
+    }
+    if (metricKey === "medicaid_expenditure_per_enrollee") {
+      return `$${Math.round(value).toLocaleString()}`;
+    }
+    return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
   const formatPeopleCount = (
     state: StateData,
     metricKey:
@@ -310,6 +392,21 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         </button>
         <button
           onClick={() => {
+            setMetricGroup("financing");
+            if (!(FINANCING_METRICS as readonly string[]).includes(selectedMetric)) {
+              setSelectedMetric("mhbg_per_capita");
+            }
+          }}
+          className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            metricGroup === "financing"
+              ? "bg-primary text-primary-foreground shadow-lg"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          }`}
+        >
+          Financing
+        </button>
+        <button
+          onClick={() => {
             setMetricGroup("gap");
             setSelectedMetric(GAP_METRIC);
           }}
@@ -323,7 +420,13 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         </button>
       </div>
       <div className="flex gap-2 flex-wrap">
-        {(metricGroup === "conditions" ? MENTAL_METRICS : metricGroup === "resources" ? RESOURCE_METRICS : [GAP_METRIC]).map((m) => (
+        {(metricGroup === "conditions"
+          ? MENTAL_METRICS
+          : metricGroup === "resources"
+            ? RESOURCE_METRICS
+            : metricGroup === "financing"
+              ? FINANCING_METRICS
+              : [GAP_METRIC]).map((m) => (
           <button
             key={m}
             onClick={() => setSelectedMetric(m)}
@@ -337,12 +440,37 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
           </button>
         ))}
       </div>
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Financing Year</p>
+              <p className="text-xs text-muted-foreground">
+                The year slider controls annual financing and Medicaid financing views. Current year: {selectedYear}
+              </p>
+            </div>
+            <div className="text-2xl font-bold text-foreground">{selectedYear}</div>
+          </div>
+          <Slider
+            min={FINANCING_YEARS[0]}
+            max={FINANCING_YEARS[FINANCING_YEARS.length - 1]}
+            step={1}
+            value={[selectedYear]}
+            onValueChange={(value) => setSelectedYear(value[0] as FinancingYear)}
+          />
+          <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+            {FINANCING_YEARS.map((year) => (
+              <span key={year}>{year}</span>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle>US Mental Health Choropleth Map</CardTitle>
           <CardDescription>
-            Click on any state to view detailed statistics and forecasts. Use Resource Availability to shade by care capacity.
+            Click on any state to view detailed statistics and forecasts. Financing metrics are year-adjustable with the slider above.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -380,9 +508,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                     if (!state) return;
                     const value = getDisplayValue(state, selectedMetric);
                     layer.bindPopup(
-                      `<strong>${state.state}</strong><br/>${metricLabels[selectedMetric]}: ${value}${
-                        selectedMetric === "suicide_rate" ? "" : metricGroup === "conditions" ? "%" : ""
-                      }`,
+                      `<strong>${state.state}</strong><br/>${metricLabels[selectedMetric]}: ${formatMetricValue(selectedMetric, value)}`,
                       { className: "state-map-popup" }
                     );
                     layer.on("click", () => {
@@ -459,8 +585,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                       #{idx + 1} {state.abbreviation} - {state.state}
                     </span>
                     <span className="font-bold" style={{ color: metricColors[selectedMetric] }}>
-                      {getDisplayValue(state, selectedMetric)}
-                      {selectedMetric === "suicide_rate" ? "" : metricGroup === "conditions" ? "%" : ""}
+                      {formatMetricValue(selectedMetric, getDisplayValue(state, selectedMetric))}
                     </span>
                   </div>
                 ))}
@@ -483,8 +608,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                       #{sortedStates.length - idx} {state.abbreviation} - {state.state}
                     </span>
                     <span className="font-bold" style={{ color: metricColors[selectedMetric] }}>
-                      {getDisplayValue(state, selectedMetric)}
-                      {selectedMetric === "suicide_rate" ? "" : metricGroup === "conditions" ? "%" : ""}
+                      {formatMetricValue(selectedMetric, getDisplayValue(state, selectedMetric))}
                     </span>
                   </div>
                 ))}
@@ -493,6 +617,39 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
           </div>
         </CardContent>
       </Card>
+
+      {metricGroup === "financing" && (
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle>National Financing Trend Context</CardTitle>
+            <CardDescription>
+              Source-aligned dashboard design for annual financing comparisons across SAMHSA block grant, public mental health spending, and Medicaid financing context.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={nationalFinancingTrend} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="year" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                  formatter={(value: number, name: string) => {
+                    if (name === "medicaid_share_of_public_mh") return [`${value}%`, "Avg Medicaid Share"];
+                    if (name === "medicaid_total_expenditures_billions") return [`$${value}B`, "Total Medicaid Expenditures"];
+                    return [`$${Number(value).toLocaleString()}M`, name === "mhbg_allotment_millions" ? "MHBG Allotment" : name === "federal_mental_health_funding_millions" ? "Federal Mental Health Funding" : "Public MH Spending"];
+                  }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="mhbg_allotment_millions" stroke="#2563eb" strokeWidth={2} name="MHBG Allotment" dot={false} />
+                <Line type="monotone" dataKey="federal_mental_health_funding_millions" stroke="#1d4ed8" strokeWidth={2} name="Federal MH Funding" dot={false} />
+                <Line type="monotone" dataKey="public_mh_spending_millions" stroke="#0f766e" strokeWidth={2} name="Public MH Spending" dot={false} />
+                <Line type="monotone" dataKey="medicaid_total_expenditures_billions" stroke="#0e7490" strokeWidth={2} name="Medicaid Expenditures (B)" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* State Details Modal */}
       <Dialog open={!!selectedState} onOpenChange={(open) => !open && setSelectedState(null)}>
@@ -678,6 +835,83 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {selectedFinancingRecord && (
+                <div className="space-y-4 my-6">
+                  <h3 className="font-semibold text-lg">Mental Health Financing Snapshot ({selectedYear})</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">MHBG per Capita</p>
+                      <p className="text-lg font-bold text-foreground">{formatMetricValue("mhbg_per_capita", selectedFinancingRecord.mhbg_per_capita)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">${selectedFinancingRecord.mhbg_allotment_millions.toLocaleString()}M total</p>
+                    </div>
+                    <div className="p-3 bg-indigo-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Federal MH Funding</p>
+                      <p className="text-lg font-bold text-foreground">{formatMetricValue("federal_mental_health_funding_per_capita", selectedFinancingRecord.federal_mental_health_funding_per_capita)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">${selectedFinancingRecord.federal_mental_health_funding_millions.toLocaleString()}M total</p>
+                    </div>
+                    <div className="p-3 bg-teal-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Public MH Spending</p>
+                      <p className="text-lg font-bold text-foreground">{formatMetricValue("public_mh_spending_per_capita", selectedFinancingRecord.public_mh_spending_per_capita)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">${selectedFinancingRecord.public_mh_spending_millions.toLocaleString()}M total</p>
+                    </div>
+                    <div className="p-3 bg-cyan-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Medicaid per Enrollee</p>
+                      <p className="text-lg font-bold text-foreground">{formatMetricValue("medicaid_expenditure_per_enrollee", selectedFinancingRecord.medicaid_expenditure_per_enrollee)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{selectedFinancingRecord.medicaid_enrollment.toLocaleString()} enrollees</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Medicaid Share</p>
+                      <p className="text-lg font-bold text-foreground">{formatMetricValue("medicaid_share_of_public_mh", selectedFinancingRecord.medicaid_share_of_public_mh)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">of public mental health financing</p>
+                    </div>
+                    <div className="p-3 bg-violet-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Policy Context Score</p>
+                      <p className="text-lg font-bold text-foreground">{formatMetricValue("behavioral_health_policy_score", selectedFinancingRecord.behavioral_health_policy_score)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">KFF-informed policy context index</p>
+                    </div>
+                  </div>
+
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={selectedFinancingTrend} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="year" stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "medicaid_share_of_public_mh") return [`${value}%`, "Medicaid Share of Public MH"];
+                          if (name === "behavioral_health_policy_score") return [value, "Policy Context Score"];
+                          return [`$${Number(value).toLocaleString()}`, name === "medicaid_expenditure_per_enrollee" ? "Medicaid per Enrollee" : name === "public_mh_spending_per_capita" ? "Public MH Spending per Capita" : "MHBG per Capita"];
+                        }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="mhbg_per_capita" stroke="#2563eb" strokeWidth={2} name="MHBG per Capita" dot={false} />
+                      <Line type="monotone" dataKey="public_mh_spending_per_capita" stroke="#0f766e" strokeWidth={2} name="Public MH Spending per Capita" dot={false} />
+                      <Line type="monotone" dataKey="medicaid_expenditure_per_enrollee" stroke="#0e7490" strokeWidth={2} name="Medicaid per Enrollee" dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">State Funds Share</p>
+                      <p className="text-lg font-bold text-foreground">{selectedFinancingRecord.state_share_of_public_mh}%</p>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Other Federal Share</p>
+                      <p className="text-lg font-bold text-foreground">{selectedFinancingRecord.other_federal_share_of_public_mh}%</p>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Local / Other Share</p>
+                      <p className="text-lg font-bold text-foreground">{selectedFinancingRecord.local_other_share_of_public_mh}%</p>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Medicaid Expenditures</p>
+                      <p className="text-lg font-bold text-foreground">${selectedFinancingRecord.medicaid_total_expenditures_millions.toLocaleString()}M</p>
+                    </div>
+                  </div>
                 </div>
               )}
 
