@@ -1,0 +1,451 @@
+state,year,medicaid_expansion_status
+Alabama,2016,0
+Alaska,2016,1
+Arizona,2016,1
+Arkansas,2016,1
+California,2016,1
+Colorado,2016,1
+Connecticut,2016,1
+Delaware,2016,1
+Florida,2016,0
+Georgia,2016,0
+Hawaii,2016,1
+Idaho,2016,0
+Illinois,2016,1
+Indiana,2016,1
+Iowa,2016,1
+Kansas,2016,0
+Kentucky,2016,1
+Louisiana,2016,0
+Maine,2016,0
+Maryland,2016,1
+Massachusetts,2016,1
+Michigan,2016,1
+Minnesota,2016,1
+Mississippi,2016,0
+Missouri,2016,0
+Montana,2016,1
+Nebraska,2016,0
+Nevada,2016,1
+New Hampshire,2016,1
+New Jersey,2016,1
+New Mexico,2016,1
+New York,2016,1
+North Carolina,2016,0
+North Dakota,2016,1
+Ohio,2016,1
+Oklahoma,2016,0
+Oregon,2016,1
+Pennsylvania,2016,1
+Rhode Island,2016,1
+South Carolina,2016,0
+South Dakota,2016,0
+Tennessee,2016,0
+Texas,2016,0
+Utah,2016,0
+Vermont,2016,1
+Virginia,2016,0
+Washington,2016,1
+West Virginia,2016,1
+Wisconsin,2016,0
+Wyoming,2016,0
+Alabama,2017,0
+Alaska,2017,1
+Arizona,2017,1
+Arkansas,2017,1
+California,2017,1
+Colorado,2017,1
+Connecticut,2017,1
+Delaware,2017,1
+Florida,2017,0
+Georgia,2017,0
+Hawaii,2017,1
+Idaho,2017,0
+Illinois,2017,1
+Indiana,2017,1
+Iowa,2017,1
+Kansas,2017,0
+Kentucky,2017,1
+Louisiana,2017,1
+Maine,2017,0
+Maryland,2017,1
+Massachusetts,2017,1
+Michigan,2017,1
+Minnesota,2017,1
+Mississippi,2017,0
+Missouri,2017,0
+Montana,2017,1
+Nebraska,2017,0
+Nevada,2017,1
+New Hampshire,2017,1
+New Jersey,2017,1
+New Mexico,2017,1
+New York,2017,1
+North Carolina,2017,0
+North Dakota,2017,1
+Ohio,2017,1
+Oklahoma,2017,0
+Oregon,2017,1
+Pennsylvania,2017,1
+Rhode Island,2017,1
+South Carolina,2017,0
+South Dakota,2017,0
+Tennessee,2017,0
+Texas,2017,0
+Utah,2017,0
+Vermont,2017,1
+Virginia,2017,0
+Washington,2017,1
+West Virginia,2017,1
+Wisconsin,2017,0
+Wyoming,2017,0
+Alabama,2018,0
+Alaska,2018,1
+Arizona,2018,1
+Arkansas,2018,1
+California,2018,1
+Colorado,2018,1
+Connecticut,2018,1
+Delaware,2018,1
+Florida,2018,0
+Georgia,2018,0
+Hawaii,2018,1
+Idaho,2018,0
+Illinois,2018,1
+Indiana,2018,1
+Iowa,2018,1
+Kansas,2018,0
+Kentucky,2018,1
+Louisiana,2018,1
+Maine,2018,0
+Maryland,2018,1
+Massachusetts,2018,1
+Michigan,2018,1
+Minnesota,2018,1
+Mississippi,2018,0
+Missouri,2018,0
+Montana,2018,1
+Nebraska,2018,0
+Nevada,2018,1
+New Hampshire,2018,1
+New Jersey,2018,1
+New Mexico,2018,1
+New York,2018,1
+North Carolina,2018,0
+North Dakota,2018,1
+Ohio,2018,1
+Oklahoma,2018,0
+Oregon,2018,1
+Pennsylvania,2018,1
+Rhode Island,2018,1
+South Carolina,2018,0
+South Dakota,2018,0
+Tennessee,2018,0
+Texas,2018,0
+Utah,2018,0
+Vermont,2018,1
+Virginia,2018,0
+Washington,2018,1
+West Virginia,2018,1
+Wisconsin,2018,0
+Wyoming,2018,0
+Alabama,2019,0
+Alaska,2019,1
+Arizona,2019,1
+Arkansas,2019,1
+California,2019,1
+Colorado,2019,1
+Connecticut,2019,1
+Delaware,2019,1
+Florida,2019,0
+Georgia,2019,0
+Hawaii,2019,1
+Idaho,2019,0
+Illinois,2019,1
+Indiana,2019,1
+Iowa,2019,1
+Kansas,2019,0
+Kentucky,2019,1
+Louisiana,2019,1
+Maine,2019,1
+Maryland,2019,1
+Massachusetts,2019,1
+Michigan,2019,1
+Minnesota,2019,1
+Mississippi,2019,0
+Missouri,2019,0
+Montana,2019,1
+Nebraska,2019,0
+Nevada,2019,1
+New Hampshire,2019,1
+New Jersey,2019,1
+New Mexico,2019,1
+New York,2019,1
+North Carolina,2019,0
+North Dakota,2019,1
+Ohio,2019,1
+Oklahoma,2019,0
+Oregon,2019,1
+Pennsylvania,2019,1
+Rhode Island,2019,1
+South Carolina,2019,0
+South Dakota,2019,0
+Tennessee,2019,0
+Texas,2019,0
+Utah,2019,0
+Vermont,2019,1
+Virginia,2019,1
+Washington,2019,1
+West Virginia,2019,1
+Wisconsin,2019,0
+Wyoming,2019,0
+Alabama,2020,0
+Alaska,2020,1
+Arizona,2020,1
+Arkansas,2020,1
+California,2020,1
+Colorado,2020,1
+Connecticut,2020,1
+Delaware,2020,1
+Florida,2020,0
+Georgia,2020,0
+Hawaii,2020,1
+Idaho,2020,1
+Illinois,2020,1
+Indiana,2020,1
+Iowa,2020,1
+Kansas,2020,0
+Kentucky,2020,1
+Louisiana,2020,1
+Maine,2020,1
+Maryland,2020,1
+Massachusetts,2020,1
+Michigan,2020,1
+Minnesota,2020,1
+Mississippi,2020,0
+Missouri,2020,0
+Montana,2020,1
+Nebraska,2020,0
+Nevada,2020,1
+New Hampshire,2020,1
+New Jersey,2020,1
+New Mexico,2020,1
+New York,2020,1
+North Carolina,2020,0
+North Dakota,2020,1
+Ohio,2020,1
+Oklahoma,2020,0
+Oregon,2020,1
+Pennsylvania,2020,1
+Rhode Island,2020,1
+South Carolina,2020,0
+South Dakota,2020,0
+Tennessee,2020,0
+Texas,2020,0
+Utah,2020,1
+Vermont,2020,1
+Virginia,2020,1
+Washington,2020,1
+West Virginia,2020,1
+Wisconsin,2020,0
+Wyoming,2020,0
+Alabama,2021,0
+Alaska,2021,1
+Arizona,2021,1
+Arkansas,2021,1
+California,2021,1
+Colorado,2021,1
+Connecticut,2021,1
+Delaware,2021,1
+Florida,2021,0
+Georgia,2021,0
+Hawaii,2021,1
+Idaho,2021,1
+Illinois,2021,1
+Indiana,2021,1
+Iowa,2021,1
+Kansas,2021,0
+Kentucky,2021,1
+Louisiana,2021,1
+Maine,2021,1
+Maryland,2021,1
+Massachusetts,2021,1
+Michigan,2021,1
+Minnesota,2021,1
+Mississippi,2021,0
+Missouri,2021,0
+Montana,2021,1
+Nebraska,2021,1
+Nevada,2021,1
+New Hampshire,2021,1
+New Jersey,2021,1
+New Mexico,2021,1
+New York,2021,1
+North Carolina,2021,0
+North Dakota,2021,1
+Ohio,2021,1
+Oklahoma,2021,0
+Oregon,2021,1
+Pennsylvania,2021,1
+Rhode Island,2021,1
+South Carolina,2021,0
+South Dakota,2021,0
+Tennessee,2021,0
+Texas,2021,0
+Utah,2021,1
+Vermont,2021,1
+Virginia,2021,1
+Washington,2021,1
+West Virginia,2021,1
+Wisconsin,2021,0
+Wyoming,2021,0
+Alabama,2022,0
+Alaska,2022,1
+Arizona,2022,1
+Arkansas,2022,1
+California,2022,1
+Colorado,2022,1
+Connecticut,2022,1
+Delaware,2022,1
+Florida,2022,0
+Georgia,2022,0
+Hawaii,2022,1
+Idaho,2022,1
+Illinois,2022,1
+Indiana,2022,1
+Iowa,2022,1
+Kansas,2022,0
+Kentucky,2022,1
+Louisiana,2022,1
+Maine,2022,1
+Maryland,2022,1
+Massachusetts,2022,1
+Michigan,2022,1
+Minnesota,2022,1
+Mississippi,2022,0
+Missouri,2022,1
+Montana,2022,1
+Nebraska,2022,1
+Nevada,2022,1
+New Hampshire,2022,1
+New Jersey,2022,1
+New Mexico,2022,1
+New York,2022,1
+North Carolina,2022,0
+North Dakota,2022,1
+Ohio,2022,1
+Oklahoma,2022,1
+Oregon,2022,1
+Pennsylvania,2022,1
+Rhode Island,2022,1
+South Carolina,2022,0
+South Dakota,2022,0
+Tennessee,2022,0
+Texas,2022,0
+Utah,2022,1
+Vermont,2022,1
+Virginia,2022,1
+Washington,2022,1
+West Virginia,2022,1
+Wisconsin,2022,0
+Wyoming,2022,0
+Alabama,2023,0
+Alaska,2023,1
+Arizona,2023,1
+Arkansas,2023,1
+California,2023,1
+Colorado,2023,1
+Connecticut,2023,1
+Delaware,2023,1
+Florida,2023,0
+Georgia,2023,0
+Hawaii,2023,1
+Idaho,2023,1
+Illinois,2023,1
+Indiana,2023,1
+Iowa,2023,1
+Kansas,2023,0
+Kentucky,2023,1
+Louisiana,2023,1
+Maine,2023,1
+Maryland,2023,1
+Massachusetts,2023,1
+Michigan,2023,1
+Minnesota,2023,1
+Mississippi,2023,0
+Missouri,2023,1
+Montana,2023,1
+Nebraska,2023,1
+Nevada,2023,1
+New Hampshire,2023,1
+New Jersey,2023,1
+New Mexico,2023,1
+New York,2023,1
+North Carolina,2023,0
+North Dakota,2023,1
+Ohio,2023,1
+Oklahoma,2023,1
+Oregon,2023,1
+Pennsylvania,2023,1
+Rhode Island,2023,1
+South Carolina,2023,0
+South Dakota,2023,0
+Tennessee,2023,0
+Texas,2023,0
+Utah,2023,1
+Vermont,2023,1
+Virginia,2023,1
+Washington,2023,1
+West Virginia,2023,1
+Wisconsin,2023,0
+Wyoming,2023,0
+Alabama,2024,0
+Alaska,2024,1
+Arizona,2024,1
+Arkansas,2024,1
+California,2024,1
+Colorado,2024,1
+Connecticut,2024,1
+Delaware,2024,1
+Florida,2024,0
+Georgia,2024,0
+Hawaii,2024,1
+Idaho,2024,1
+Illinois,2024,1
+Indiana,2024,1
+Iowa,2024,1
+Kansas,2024,0
+Kentucky,2024,1
+Louisiana,2024,1
+Maine,2024,1
+Maryland,2024,1
+Massachusetts,2024,1
+Michigan,2024,1
+Minnesota,2024,1
+Mississippi,2024,0
+Missouri,2024,1
+Montana,2024,1
+Nebraska,2024,1
+Nevada,2024,1
+New Hampshire,2024,1
+New Jersey,2024,1
+New Mexico,2024,1
+New York,2024,1
+North Carolina,2024,1
+North Dakota,2024,1
+Ohio,2024,1
+Oklahoma,2024,1
+Oregon,2024,1
+Pennsylvania,2024,1
+Rhode Island,2024,1
+South Carolina,2024,0
+South Dakota,2024,1
+Tennessee,2024,0
+Texas,2024,0
+Utah,2024,1
+Vermont,2024,1
+Virginia,2024,1
+Washington,2024,1
+West Virginia,2024,1
+Wisconsin,2024,0
+Wyoming,2024,0

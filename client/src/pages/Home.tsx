@@ -1,17 +1,40 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from "recharts";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  ScatterChart,
+  Scatter,
+  ReferenceLine,
+  Cell,
+} from "recharts";
 import { TrendingUp, Users, Heart, AlertCircle, Map } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { nationalTrendData } from "@/data/nationalTrendData";
+import { getExpansionTransitionStates } from "@/data/medicaidExpansionData";
 import { getStateResources, stateData } from "@/data/stateData";
 import {
   FINANCING_YEARS,
+  getExpansionEventTrend,
+  getExpansionMismatchDistribution,
+  getExpansionMismatchTrend,
   getFinancingProvenanceSummary,
+  getMedicaidExpansionPolicyRegression,
   getNationalFinancingTrend,
   getNeedFundingRegression,
   getPersistentUnderfundingThreshold,
   getPersistentUnderinvestmentStates,
+  getStateExpansionTrend,
   getStateFinancingByYear,
   getTypologySummaryByYear,
 } from "@/data/stateFinancingData";
@@ -58,6 +81,7 @@ const stats = [
 
 export default function Home() {
   const trendData = [...nationalTrendData];
+  const expansionTransitionStates = getExpansionTransitionStates();
   const [animatedValues, setAnimatedValues] = useState({
     ami: 0,
     smi: 0,
@@ -65,6 +89,9 @@ export default function Home() {
     suicide: 0,
   });
   const [geoScope, setGeoScope] = useState<"states" | "countries">("states");
+  const [selectedExpansionState, setSelectedExpansionState] = useState(
+    expansionTransitionStates[expansionTransitionStates.length - 1]?.abbreviation ?? "NC"
+  );
   const resourceAvailabilityData = stateData
     .map((state) => {
       const resources = getStateResources(state.abbreviation);
@@ -90,6 +117,14 @@ export default function Home() {
   const persistentUnderinvestmentThreshold = getPersistentUnderfundingThreshold();
   const persistentUnderinvestmentStates = getPersistentUnderinvestmentStates().slice(0, 10);
   const latestTypologySummary = getTypologySummaryByYear(latestFinancingYear);
+  const expansionMismatchTrend = getExpansionMismatchTrend();
+  const expansionMismatchDistribution = getExpansionMismatchDistribution(latestFinancingYear);
+  const expansionEventTrend = getExpansionEventTrend();
+  const medicaidExpansionPolicyRegression = getMedicaidExpansionPolicyRegression();
+  const selectedExpansionStateTrend = getStateExpansionTrend(selectedExpansionState);
+  const selectedExpansionStateMeta = expansionTransitionStates.find(
+    (state) => state.abbreviation === selectedExpansionState
+  );
   const latestFinancingCoverage = latestFinancingAllStates.reduce(
     (acc, record) => {
       const summary = getFinancingProvenanceSummary(record);
@@ -709,6 +744,234 @@ export default function Home() {
                         <p className="text-xs text-muted-foreground">{cluster.states.join(", ")}</p>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle>Policy Context: Medicaid Expansion and Need-Resource Alignment</CardTitle>
+                  <CardDescription>
+                    Medicaid expansion status is merged into the state-year financing panel to compare whether expansion states are systematically less under-resourced relative to modeled need.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <ResponsiveContainer width="100%" height={320}>
+                    <LineChart data={expansionMismatchTrend} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="year" stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                        formatter={(value: number, name: string) => [
+                          value,
+                          name === "expansion_mean_mismatch_index" ? "Expansion states" : "Non-expansion states",
+                        ]}
+                      />
+                      <Legend />
+                      <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
+                      <Line
+                        type="monotone"
+                        dataKey="expansion_mean_mismatch_index"
+                        stroke="#0f766e"
+                        strokeWidth={2.5}
+                        name="Expansion States"
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="non_expansion_mean_mismatch_index"
+                        stroke="#c2410c"
+                        strokeWidth={2.5}
+                        name="Non-expansion States"
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div className="rounded-lg border p-4">
+                      <h3 className="text-sm font-semibold text-foreground mb-1">
+                        {latestFinancingYear} mismatch distribution by expansion status
+                      </h3>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Each point is a state. Higher mismatch index values indicate more funding than predicted given need; lower values indicate greater underfunding.
+                      </p>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <ScatterChart margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis
+                            type="number"
+                            dataKey="x_position"
+                            domain={[-0.3, 1.3]}
+                            ticks={[0, 1]}
+                            stroke="#6b7280"
+                            tickFormatter={(value) => (value === 1 ? "Expansion" : "Non-expansion")}
+                          />
+                          <YAxis type="number" dataKey="mismatch_index" stroke="#6b7280" />
+                          <Tooltip
+                            cursor={{ strokeDasharray: "4 4" }}
+                            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                            labelFormatter={(_label: unknown, payload: any[]) =>
+                              payload?.[0]?.payload
+                                ? `${payload[0].payload.state} (${payload[0].payload.abbreviation})`
+                                : ""
+                            }
+                            formatter={(value: number, _name: string, item: any) => {
+                              const payload = item.payload as (typeof expansionMismatchDistribution)[number];
+                              return [value, `${payload.medicaid_expansion_label} mismatch index`];
+                            }}
+                          />
+                          <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
+                          <Scatter data={expansionMismatchDistribution} name="State-years">
+                            {expansionMismatchDistribution.map((point) => (
+                              <Cell
+                                key={`${point.abbreviation}-${point.year}`}
+                                fill={point.medicaid_expansion_status === 1 ? "#0f766e" : "#c2410c"}
+                              />
+                            ))}
+                          </Scatter>
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                        <div>
+                          <h3 className="text-sm font-semibold text-foreground">State-specific pre/post expansion trend</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Track mismatch before and after the first full expansion year for late-adopting states.
+                          </p>
+                        </div>
+                        <select
+                          value={selectedExpansionState}
+                          onChange={(event) => setSelectedExpansionState(event.target.value)}
+                          className="rounded-md border bg-background px-3 py-2 text-sm"
+                        >
+                          {expansionTransitionStates.map((state) => (
+                            <option key={state.abbreviation} value={state.abbreviation}>
+                              {state.state}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={selectedExpansionStateTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis dataKey="year" stroke="#6b7280" />
+                          <YAxis stroke="#6b7280" />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                            formatter={(value: number) => [value, "Mismatch index"]}
+                          />
+                          <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
+                          {selectedExpansionStateMeta && (
+                            <ReferenceLine
+                              x={selectedExpansionStateMeta.first_full_expansion_year}
+                              stroke="#2563eb"
+                              strokeDasharray="5 5"
+                              label={{ value: "Expansion", fill: "#2563eb", position: "insideTopRight" }}
+                            />
+                          )}
+                          <Line
+                            type="monotone"
+                            dataKey="mismatch_index"
+                            stroke="#2563eb"
+                            strokeWidth={2.5}
+                            dot={{ r: 3 }}
+                            name="Mismatch Index"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div className="rounded-lg border p-4">
+                      <h3 className="text-sm font-semibold text-foreground mb-1">Average event-time pattern around expansion</h3>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Event-time view centered on each state&apos;s first full expansion year. This is descriptive and does not by itself identify a causal effect.
+                      </p>
+                      <ResponsiveContainer width="100%" height={260}>
+                        <LineChart data={expansionEventTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis dataKey="event_time" stroke="#6b7280" />
+                          <YAxis stroke="#6b7280" />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                            formatter={(value: number, name: string) => [
+                              value,
+                              name === "mean_mismatch_index" ? "Mean mismatch index" : "Mean gap per capita",
+                            ]}
+                          />
+                          <ReferenceLine x={0} stroke="#2563eb" strokeDasharray="5 5" />
+                          <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
+                          <Line
+                            type="monotone"
+                            dataKey="mean_mismatch_index"
+                            stroke="#7c3aed"
+                            strokeWidth={2.5}
+                            dot={{ r: 3 }}
+                            name="Mean Mismatch Index"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <h3 className="text-sm font-semibold text-foreground mb-4">Panel regression: mismatch index on Medicaid expansion</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b text-left text-muted-foreground">
+                              <th className="py-2 pr-4 font-medium">Term</th>
+                              <th className="py-2 pr-4 font-medium">Estimate</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="py-2 pr-4">Medicaid expansion status</td>
+                              <td className="py-2 pr-4">{medicaidExpansionPolicyRegression.coefficient}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 pr-4">Standard error</td>
+                              <td className="py-2 pr-4">{medicaidExpansionPolicyRegression.standardError}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 pr-4">t-statistic</td>
+                              <td className="py-2 pr-4">{medicaidExpansionPolicyRegression.tStatistic}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 pr-4">Within R²</td>
+                              <td className="py-2 pr-4">{medicaidExpansionPolicyRegression.withinRSquared}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 pr-4">State fixed effects</td>
+                              <td className="py-2 pr-4">Included</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 pr-4">Year fixed effects</td>
+                              <td className="py-2 pr-4">Included</td>
+                            </tr>
+                            <tr>
+                              <td className="py-2 pr-4">Panel size</td>
+                              <td className="py-2 pr-4">
+                                {medicaidExpansionPolicyRegression.sampleSize} state-years ({medicaidExpansionPolicyRegression.stateCount} states, {medicaidExpansionPolicyRegression.yearCount} years)
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="mt-4 space-y-3 text-sm">
+                        <p className="text-foreground">{medicaidExpansionPolicyRegression.interpretation}</p>
+                        <p className="text-muted-foreground">
+                          Controls omitted from this specification: {medicaidExpansionPolicyRegression.controlsOmitted.join("; ")}.
+                        </p>
+                        <p className="text-muted-foreground">
+                          {medicaidExpansionPolicyRegression.caution}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

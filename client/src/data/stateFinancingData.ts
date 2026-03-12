@@ -2,6 +2,8 @@ import { getStateResources, stateData } from "./stateData";
 import { officialCmsMedicaidExpendituresByStateYear } from "./officialCmsMedicaidExpenditures";
 import { officialMhbgAwardsByStateYear } from "./officialMhbgAwards";
 import { officialUrsFinancingByStateYear } from "./officialUrsFinancing";
+import { getMedicaidExpansionRecord } from "./medicaidExpansionData";
+import type { MedicaidExpansionLabel, MedicaidExpansionStatus } from "./medicaidExpansionData";
 
 export const FINANCING_YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024] as const;
 export type FinancingYear = (typeof FINANCING_YEARS)[number];
@@ -55,6 +57,11 @@ export interface StateFinancingRecord {
   funding_gap_per_capita: number;
   funding_gap_percent: number;
   funding_gap_score: number;
+  mismatch_index: number;
+  medicaid_expansion_status: MedicaidExpansionStatus;
+  medicaid_expansion_label: MedicaidExpansionLabel;
+  first_full_expansion_year: FinancingYear | null;
+  expansion_event_time: number | null;
   average_gap_per_capita: number;
   gap_trend_per_year: number;
   gap_std_per_capita: number;
@@ -109,6 +116,61 @@ export interface TypologyClusterSummary {
   color: string;
   count: number;
   states: string[];
+}
+
+export interface ExpansionMismatchTrendPoint {
+  year: FinancingYear;
+  expansion_mean_mismatch_index: number;
+  non_expansion_mean_mismatch_index: number;
+  expansion_mean_gap_per_capita: number;
+  non_expansion_mean_gap_per_capita: number;
+  expansion_count: number;
+  non_expansion_count: number;
+}
+
+export interface ExpansionMismatchDistributionPoint {
+  state: string;
+  abbreviation: string;
+  year: FinancingYear;
+  medicaid_expansion_status: MedicaidExpansionStatus;
+  medicaid_expansion_label: MedicaidExpansionLabel;
+  mismatch_index: number;
+  funding_gap_per_capita: number;
+  x_position: number;
+}
+
+export interface ExpansionEventTrendPoint {
+  event_time: number;
+  mean_mismatch_index: number;
+  mean_gap_per_capita: number;
+  state_count: number;
+}
+
+export interface ExpansionStateTrendPoint {
+  state: string;
+  abbreviation: string;
+  year: FinancingYear;
+  mismatch_index: number;
+  funding_gap_per_capita: number;
+  medicaid_expansion_status: MedicaidExpansionStatus;
+  medicaid_expansion_label: MedicaidExpansionLabel;
+  expansion_event_time: number | null;
+  first_full_expansion_year: FinancingYear | null;
+}
+
+export interface MedicaidExpansionPolicyRegressionSummary {
+  coefficient: number;
+  standardError: number;
+  tStatistic: number;
+  withinRSquared: number;
+  sampleSize: number;
+  stateCount: number;
+  yearCount: number;
+  significant: boolean;
+  controlsIncluded: string[];
+  controlsOmitted: string[];
+  interpretation: string;
+  caution: string;
 }
 
 export const financingMetricLabels: Record<FinancingMetric, string> = {
@@ -530,9 +592,16 @@ export const stateFinancingData: StateFinancingRecord[] = recordsWithPersistence
   const typology = typologyByYear.get(record.year)!;
   const clusterId = typology.assignments.get(record.abbreviation) ?? 0;
   const clusterMeta = typology.clusterMeta[clusterId];
+  const expansionRecord = getMedicaidExpansionRecord(record.abbreviation, record.year);
+  const firstFullExpansionYear = (expansionRecord?.first_full_expansion_year ?? null) as FinancingYear | null;
 
   return {
     ...record,
+    mismatch_index: record.funding_gap_score,
+    medicaid_expansion_status: expansionRecord?.medicaid_expansion_status ?? 0,
+    medicaid_expansion_label: expansionRecord?.medicaid_expansion_label ?? "Non-expansion",
+    first_full_expansion_year: firstFullExpansionYear,
+    expansion_event_time: firstFullExpansionYear === null ? null : record.year - firstFullExpansionYear,
     typology_cluster_id: clusterId,
     typology_cluster_label: clusterMeta.label,
     typology_cluster_description: clusterMeta.description,
@@ -675,3 +744,161 @@ export const getNationalFinancingTrend = () =>
       regression_slope: regression.slope,
     };
   });
+
+export const getExpansionMismatchTrend = (): ExpansionMismatchTrendPoint[] =>
+  FINANCING_YEARS.map((year) => {
+    const rows = getStateFinancingByYear(year);
+    const expansionRows = rows.filter((record) => record.medicaid_expansion_status === 1);
+    const nonExpansionRows = rows.filter((record) => record.medicaid_expansion_status === 0);
+
+    return {
+      year,
+      expansion_mean_mismatch_index: round(mean(expansionRows.map((record) => record.mismatch_index)), 2),
+      non_expansion_mean_mismatch_index: round(mean(nonExpansionRows.map((record) => record.mismatch_index)), 2),
+      expansion_mean_gap_per_capita: round(mean(expansionRows.map((record) => record.funding_gap_per_capita)), 2),
+      non_expansion_mean_gap_per_capita: round(mean(nonExpansionRows.map((record) => record.funding_gap_per_capita)), 2),
+      expansion_count: expansionRows.length,
+      non_expansion_count: nonExpansionRows.length,
+    };
+  });
+
+export const getExpansionMismatchDistribution = (year: FinancingYear): ExpansionMismatchDistributionPoint[] => {
+  const rows = getStateFinancingByYear(year).sort((left, right) => left.abbreviation.localeCompare(right.abbreviation));
+
+  return rows.map((record, index) => {
+    const jitter = (((index % 7) - 3) * 0.045);
+    return {
+      state: record.state,
+      abbreviation: record.abbreviation,
+      year: record.year,
+      medicaid_expansion_status: record.medicaid_expansion_status,
+      medicaid_expansion_label: record.medicaid_expansion_label,
+      mismatch_index: record.mismatch_index,
+      funding_gap_per_capita: record.funding_gap_per_capita,
+      x_position: record.medicaid_expansion_status + jitter,
+    };
+  });
+};
+
+export const getStateExpansionTrend = (abbreviation: string): ExpansionStateTrendPoint[] =>
+  stateFinancingData
+    .filter((record) => record.abbreviation === abbreviation)
+    .sort((left, right) => left.year - right.year)
+    .map((record) => ({
+      state: record.state,
+      abbreviation: record.abbreviation,
+      year: record.year,
+      mismatch_index: record.mismatch_index,
+      funding_gap_per_capita: record.funding_gap_per_capita,
+      medicaid_expansion_status: record.medicaid_expansion_status,
+      medicaid_expansion_label: record.medicaid_expansion_label,
+      expansion_event_time: record.expansion_event_time,
+      first_full_expansion_year: record.first_full_expansion_year,
+    }));
+
+export const getExpansionEventTrend = (window = 4): ExpansionEventTrendPoint[] => {
+  const rows = stateFinancingData.filter(
+    (record) =>
+      record.first_full_expansion_year !== null &&
+      record.first_full_expansion_year > 2016 &&
+      record.expansion_event_time !== null &&
+      Math.abs(record.expansion_event_time) <= window
+  );
+  const grouped = new Map<number, StateFinancingRecord[]>();
+
+  rows.forEach((record) => {
+    const key = record.expansion_event_time!;
+    grouped.set(key, [...(grouped.get(key) ?? []), record]);
+  });
+
+  return Array.from(grouped.entries())
+    .map(([eventTime, records]) => ({
+      event_time: eventTime,
+      mean_mismatch_index: round(mean(records.map((record) => record.mismatch_index)), 2),
+      mean_gap_per_capita: round(mean(records.map((record) => record.funding_gap_per_capita)), 2),
+      state_count: records.length,
+    }))
+    .sort((left, right) => left.event_time - right.event_time);
+};
+
+const medicaidExpansionPolicyRegression: MedicaidExpansionPolicyRegressionSummary = (() => {
+  const rows = stateFinancingData.map((record) => ({
+    abbreviation: record.abbreviation,
+    year: record.year,
+    y: record.mismatch_index,
+    x: record.medicaid_expansion_status,
+  }));
+  const stateMeans = new Map<string, { x: number; y: number }>();
+  const yearMeans = new Map<FinancingYear, { x: number; y: number }>();
+  const overallX = mean(rows.map((row) => row.x));
+  const overallY = mean(rows.map((row) => row.y));
+
+  Array.from(new Set(rows.map((row) => row.abbreviation))).forEach((abbreviation) => {
+    const stateRows = rows.filter((row) => row.abbreviation === abbreviation);
+    stateMeans.set(abbreviation, {
+      x: mean(stateRows.map((row) => row.x)),
+      y: mean(stateRows.map((row) => row.y)),
+    });
+  });
+
+  FINANCING_YEARS.forEach((year) => {
+    const yearRows = rows.filter((row) => row.year === year);
+    yearMeans.set(year, {
+      x: mean(yearRows.map((row) => row.x)),
+      y: mean(yearRows.map((row) => row.y)),
+    });
+  });
+
+  const transformed = rows.map((row) => {
+    const stateMean = stateMeans.get(row.abbreviation)!;
+    const yearMean = yearMeans.get(row.year)!;
+    const xTilde = row.x - stateMean.x - yearMean.x + overallX;
+    const yTilde = row.y - stateMean.y - yearMean.y + overallY;
+    return {
+      ...row,
+      xTilde,
+      yTilde,
+    };
+  });
+
+  const ssx = transformed.reduce((sum, row) => sum + row.xTilde ** 2, 0);
+  const sxy = transformed.reduce((sum, row) => sum + row.xTilde * row.yTilde, 0);
+  const coefficient = ssx === 0 ? 0 : sxy / ssx;
+  const residuals = transformed.map((row) => row.yTilde - coefficient * row.xTilde);
+  const rss = residuals.reduce((sum, residual) => sum + residual ** 2, 0);
+  const tss = transformed.reduce((sum, row) => sum + row.yTilde ** 2, 0);
+  const degreesOfFreedom = Math.max(1, rows.length - stateMeans.size - yearMeans.size);
+  const sigmaSquared = rss / degreesOfFreedom;
+  const standardError = ssx === 0 ? 0 : Math.sqrt(sigmaSquared / ssx);
+  const tStatistic = standardError === 0 ? 0 : coefficient / standardError;
+  const withinRSquared = tss === 0 ? 1 : 1 - rss / tss;
+  const coefficientRounded = round(coefficient, 3);
+  const standardErrorRounded = round(standardError, 3);
+  const tStatisticRounded = round(tStatistic, 2);
+  const significant = Math.abs(tStatisticRounded) >= 2;
+
+  return {
+    coefficient: coefficientRounded,
+    standardError: standardErrorRounded,
+    tStatistic: tStatisticRounded,
+    withinRSquared: round(withinRSquared, 3),
+    sampleSize: rows.length,
+    stateCount: stateMeans.size,
+    yearCount: yearMeans.size,
+    significant,
+    controlsIncluded: [],
+    controlsOmitted: [
+      "poverty_rate unavailable in current panel",
+      "unemployment_rate unavailable in current panel",
+      "provider_density absorbed by state fixed effects because it is time-invariant in this dashboard",
+    ],
+    interpretation:
+      coefficientRounded >= 0
+        ? `With state and year fixed effects, Medicaid expansion status is associated with a ${coefficientRounded}-point higher mismatch index, which corresponds to less underfunding relative to modeled need.`
+        : `With state and year fixed effects, Medicaid expansion status is associated with a ${Math.abs(coefficientRounded)}-point lower mismatch index, which corresponds to more underfunding relative to modeled need.`,
+    caution:
+      "This is an observational fixed-effects association, not a definitive causal estimate. Identification comes from states that changed expansion status during 2016-2024, and unmeasured concurrent policy changes may also affect the mismatch index.",
+  };
+})();
+
+export const getMedicaidExpansionPolicyRegression = () => medicaidExpansionPolicyRegression;

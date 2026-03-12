@@ -89,6 +89,12 @@ export const citationLinks: CitationLink[] = [
       "Annual survey archive used for contextual interpretation of state Medicaid spending, enrollment, and policy changes.",
   },
   {
+    title: "KFF Status of State Medicaid Expansion Decisions",
+    href: "https://www.kff.org/status-of-state-medicaid-expansion-decisions/",
+    description:
+      "State policy timeline used to normalize annual Medicaid expansion status for the policy analysis module.",
+  },
+  {
     title: "KFF Medicaid Coverage of Behavioral Health Services in 2022",
     href: "https://www.kff.org/mental-health/medicaid-coverage-of-behavioral-health-services-in-2022-findings-from-a-survey-of-state-medicaid-programs/",
     description:
@@ -221,13 +227,14 @@ export const metricProvenance: MetricProvenance[] = [
     metric: "mental_health_financing",
     label: "Mental Health Financing",
     tier: "mixed",
-    status: "Integrated as a mixed official/model state-year financing layer from 2016-2024 with direct SAMHSA MHBG, SAMHSA URS, and CMS Financial Management Report inputs where available.",
-    notes: "The financing dashboard now incorporates direct SAMHSA MHBG HTML tables for FY2021-FY2023, direct SAMHSA URS state financing extracts for the extracted URS years, and direct CMS Financial Management Report Medicaid expenditure workbooks for the extracted CMS years. Remaining uncovered years, states not yet parsed from URS, and the KFF policy context layer still rely on harmonized modeling.",
+    status: "Integrated as a mixed official/model state-year financing layer from 2016-2024 with direct SAMHSA MHBG, SAMHSA URS, CMS Financial Management Report, and KFF Medicaid expansion policy inputs where available.",
+    notes: "The financing dashboard now incorporates direct SAMHSA MHBG HTML tables for FY2021-FY2023, direct SAMHSA URS state financing extracts for the extracted URS years, direct CMS Financial Management Report Medicaid expenditure workbooks for the extracted CMS years, and a normalized KFF Medicaid expansion timeline for policy analysis. Remaining uncovered years and still-missing URS state-years rely on harmonized modeling.",
     sources: [
       "SAMHSA Community Mental Health Services Block Grant",
       "SAMHSA Uniform Reporting System (URS) Output Tables",
       "CMS State Budget & Expenditure Reporting for Medicaid and CHIP",
       "KFF Medicaid Budget Survey Archives",
+      "KFF Status of State Medicaid Expansion Decisions",
       "KFF Medicaid Coverage of Behavioral Health Services in 2022",
     ],
   },
