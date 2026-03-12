@@ -2,13 +2,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from "recharts";
 import { TrendingUp, Users, Heart, AlertCircle, Map } from "lucide-react";
-import { useEffect, useState } from "react";
-import ChoroplethMap from "@/components/ChoroplethMap";
-import CountryChoroplethMap from "@/components/CountryChoroplethMap";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { nationalTrendData } from "@/data/nationalTrendData";
 import { getStateResources, stateData } from "@/data/stateData";
 import { FINANCING_YEARS, getFinancingProvenanceSummary, getNationalFinancingTrend, getStateFinancingByYear } from "@/data/stateFinancingData";
 import { citationLinks, metricProvenance } from "@shared/dataProvenance";
+
+const ChoroplethMap = lazy(() => import("@/components/ChoroplethMap"));
+const CountryChoroplethMap = lazy(() => import("@/components/CountryChoroplethMap"));
 
 // Key statistics
 const stats = [
@@ -195,6 +196,13 @@ export default function Home() {
   const smiStateTrend = getStateStackedTrend("smi");
   const youthStateTrend = getStateStackedTrend("mde_youth");
   const suicideStateTrend = getStateStackedTrend("suicide_rate");
+  const mapLoadingFallback = (
+    <Card className="border-0 shadow-lg">
+      <CardContent className="flex h-[640px] items-center justify-center text-sm text-muted-foreground">
+        Loading geographic layer...
+      </CardContent>
+    </Card>
+  );
 
   // Animate stat values on load
   useEffect(() => {
@@ -497,7 +505,9 @@ export default function Home() {
                   Countries
                 </button>
               </div>
-              {geoScope === "states" ? <ChoroplethMap metric="ami" /> : <CountryChoroplethMap metric="ami" />}
+              <Suspense fallback={mapLoadingFallback}>
+                {geoScope === "states" ? <ChoroplethMap metric="ami" /> : <CountryChoroplethMap metric="ami" />}
+              </Suspense>
             </div>
           </TabsContent>
 
