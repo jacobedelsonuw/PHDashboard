@@ -15,7 +15,9 @@ import {
   financingMetricLabels,
   getFinancingMetricValue,
   getFinancingProvenanceSummary,
+  getNeedFundingRegression,
   getFinancingSourceGapNote,
+  getTypologySummaryByYear,
   getStateFinancingByYear,
   getStateFinancingRecord,
   getNationalFinancingTrend,
@@ -51,13 +53,17 @@ const RESOURCE_METRICS = [
   "crisis_centers_per_million",
 ] as const;
 const GAP_METRIC = "burden_resource_gap" as const;
+const NEED_FUNDING_GAP_METRIC = "funding_gap_per_capita" as const;
+const TYPOLOGY_METRIC = "system_typology" as const;
 
 type MentalMetric = (typeof MENTAL_METRICS)[number];
 type ResourceMetric = (typeof RESOURCE_METRICS)[number];
 type FinancingMetricKey = FinancingMetric;
 type GapMetric = typeof GAP_METRIC;
-type Metric = MentalMetric | ResourceMetric | FinancingMetricKey | GapMetric;
-type MetricGroup = "conditions" | "resources" | "financing" | "gap";
+type NeedFundingGapMetric = typeof NEED_FUNDING_GAP_METRIC;
+type TypologyMetric = typeof TYPOLOGY_METRIC;
+type Metric = MentalMetric | ResourceMetric | FinancingMetricKey | GapMetric | NeedFundingGapMetric | TypologyMetric;
+type MetricGroup = "conditions" | "resources" | "financing" | "gap" | "needFunding" | "typology";
 type TotalMetricKey =
   | "ami_total"
   | "smi_total"
@@ -77,6 +83,10 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
       ? "resources"
       : (FINANCING_METRICS as readonly string[]).includes(metric)
         ? "financing"
+        : metric === NEED_FUNDING_GAP_METRIC
+          ? "needFunding"
+          : metric === TYPOLOGY_METRIC
+            ? "typology"
         : "conditions"
   );
 
@@ -106,6 +116,8 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     medicaid_share_of_public_mh: financingMetricLabels.medicaid_share_of_public_mh,
     behavioral_health_policy_score: financingMetricLabels.behavioral_health_policy_score,
     burden_resource_gap: "Burden-Resource Gap Index",
+    funding_gap_per_capita: "Underfunded vs Overfunded Relative to Need",
+    system_typology: "Mental Health System Typology",
   };
 
   const metricColors: Record<Metric, string> = {
@@ -134,6 +146,8 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     medicaid_share_of_public_mh: "#0f766e",
     behavioral_health_policy_score: "#7c3aed",
     burden_resource_gap: "#dc2626",
+    funding_gap_per_capita: "#1d4ed8",
+    system_typology: "#7c3aed",
   };
 
   const stateByName = useMemo(
@@ -161,7 +175,10 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     () => new Map(nationalTrendData.map((point) => [point.year, point])),
     []
   );
-  const activeYearOptions: number[] = metricGroup === "financing" ? [...FINANCING_YEARS] : nationalTrendData.map((point) => point.year);
+  const activeYearOptions: number[] =
+    metricGroup === "financing" || metricGroup === "needFunding" || metricGroup === "typology"
+      ? [...FINANCING_YEARS]
+      : nationalTrendData.map((point) => point.year);
   const selectedTrendPoint = trendByYear.get(selectedYear) ?? nationalTrendData[nationalTrendData.length - 1];
   const selectedFinancingRows = useMemo(
     () => getStateFinancingByYear(selectedYear as (typeof FINANCING_YEARS)[number]),
@@ -191,6 +208,14 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     [selectedFinancingRows]
   );
   const nationalFinancingTrend = useMemo(() => getNationalFinancingTrend(), []);
+  const selectedNeedFundingRegression = useMemo(
+    () => getNeedFundingRegression(selectedYear as (typeof FINANCING_YEARS)[number]),
+    [selectedYear]
+  );
+  const selectedTypologySummary = useMemo(
+    () => getTypologySummaryByYear(selectedYear as (typeof FINANCING_YEARS)[number]),
+    [selectedYear]
+  );
   const selectedFinancingRecord = selectedState
     ? getStateFinancingRecord(selectedState.abbreviation, selectedYear as (typeof FINANCING_YEARS)[number])
     : null;
@@ -205,6 +230,10 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         : [],
     [selectedState]
   );
+  const fundingGapRange = useMemo(() => {
+    const values = selectedFinancingRows.map((record) => record.funding_gap_per_capita);
+    return { min: Math.min(...values), max: Math.max(...values) };
+  }, [selectedFinancingRows]);
   const roundMetricValue = (metricKey: MentalMetric | ResourceMetric, value: number) =>
     metricKey === "suicide_rate" || metricKey === "crisis_centers_per_million"
       ? Math.round(value * 10) / 10
@@ -348,6 +377,12 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const getGapValue = (state: StateData) => burdenGapByAbbreviation.get(state.abbreviation) ?? 0;
   const getDisplayValue = (state: StateData, metricKey: Metric) => {
     if (metricKey === GAP_METRIC) return getGapValue(state);
+    if (metricKey === NEED_FUNDING_GAP_METRIC) {
+      return financingByAbbreviation.get(state.abbreviation)?.funding_gap_per_capita ?? 0;
+    }
+    if (metricKey === TYPOLOGY_METRIC) {
+      return financingByAbbreviation.get(state.abbreviation)?.typology_cluster_id ?? 0;
+    }
     return getMetricValue(state, metricKey);
   };
   const getFillColor = (metricKey: Metric, value: number): string => {
@@ -357,6 +392,16 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
       const hue = normalized >= 0 ? 0 : 120;
       const lightness = 62 - Math.abs(normalized) * 20;
       return `hsl(${hue}, 75%, ${lightness}%)`;
+    }
+    if (metricKey === NEED_FUNDING_GAP_METRIC) {
+      const maxAbs = Math.max(Math.abs(fundingGapRange.min), Math.abs(fundingGapRange.max)) || 1;
+      const normalized = Math.max(-1, Math.min(1, value / maxAbs));
+      const hue = normalized >= 0 ? 210 : 0;
+      const lightness = 64 - Math.abs(normalized) * 18;
+      return `hsl(${hue}, 72%, ${lightness}%)`;
+    }
+    if (metricKey === TYPOLOGY_METRIC) {
+      return selectedTypologySummary.find((cluster) => cluster.clusterId === value)?.color ?? "#7c3aed";
     }
     if ((MENTAL_METRICS as readonly string[]).includes(metricKey)) {
       const { min, max } = mentalRangeByMetric[metricKey as MentalMetric];
@@ -389,6 +434,12 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const geoJsonKey = `${selectedMetric}-${selectedYear}-${hoveredState?.abbreviation || ""}`;
   const formatMetricValue = (metricKey: Metric, value: number) => {
     if (metricKey === GAP_METRIC) return value.toFixed(2);
+    if (metricKey === NEED_FUNDING_GAP_METRIC) {
+      return `${value >= 0 ? "+" : ""}$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (metricKey === TYPOLOGY_METRIC) {
+      return selectedTypologySummary.find((cluster) => cluster.clusterId === value)?.label ?? "Typology";
+    }
     if (metricKey === "suicide_rate") return value.toFixed(1);
     if ((MENTAL_METRICS as readonly string[]).includes(metricKey)) return `${value.toFixed(2)}%`;
     if ((RESOURCE_METRICS as readonly string[]).includes(metricKey)) {
@@ -493,6 +544,34 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         </button>
         <button
           onClick={() => {
+            setMetricGroup("needFunding");
+            setSelectedYear(FINANCING_YEARS[FINANCING_YEARS.length - 1]);
+            setSelectedMetric(NEED_FUNDING_GAP_METRIC);
+          }}
+          className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            metricGroup === "needFunding"
+              ? "bg-primary text-primary-foreground shadow-lg"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          }`}
+        >
+          Underfunded vs Overfunded
+        </button>
+        <button
+          onClick={() => {
+            setMetricGroup("typology");
+            setSelectedYear(FINANCING_YEARS[FINANCING_YEARS.length - 1]);
+            setSelectedMetric(TYPOLOGY_METRIC);
+          }}
+          className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            metricGroup === "typology"
+              ? "bg-primary text-primary-foreground shadow-lg"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          }`}
+        >
+          System Typology
+        </button>
+        <button
+          onClick={() => {
             setMetricGroup("gap");
             setSelectedYear(nationalTrendData[nationalTrendData.length - 1].year);
             setSelectedMetric(GAP_METRIC);
@@ -513,6 +592,10 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
             ? RESOURCE_METRICS
             : metricGroup === "financing"
               ? FINANCING_METRICS
+              : metricGroup === "needFunding"
+                ? [NEED_FUNDING_GAP_METRIC]
+                : metricGroup === "typology"
+                  ? [TYPOLOGY_METRIC]
               : [GAP_METRIC]).map((m) => (
           <button
             key={m}
@@ -626,93 +709,177 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
           {/* Legend */}
           <div className="mt-6 flex items-center gap-4 flex-wrap">
             <span className="text-sm font-semibold text-foreground">Legend:</span>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded" style={{ backgroundColor: "#10b981" }} />
-              <span className="text-sm text-muted-foreground">Lowest</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded" style={{ backgroundColor: "#84cc16" }} />
-              <span className="text-sm text-muted-foreground">Low-Medium</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded" style={{ backgroundColor: "#eab308" }} />
-              <span className="text-sm text-muted-foreground">Medium</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded" style={{ backgroundColor: "#f97316" }} />
-              <span className="text-sm text-muted-foreground">High</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded" style={{ backgroundColor: "#dc2626" }} />
-              <span className="text-sm text-muted-foreground">Highest</span>
-            </div>
+            {metricGroup === "typology" ? (
+              selectedTypologySummary.map((cluster) => (
+                <div key={cluster.clusterId} className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: cluster.color }} />
+                  <span className="text-sm text-muted-foreground">{cluster.label}</span>
+                </div>
+              ))
+            ) : metricGroup === "needFunding" ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#dc2626" }} />
+                  <span className="text-sm text-muted-foreground">Underfunded</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#fca5a5" }} />
+                  <span className="text-sm text-muted-foreground">Slightly Under</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#e5e7eb" }} />
+                  <span className="text-sm text-muted-foreground">Near Expected</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#93c5fd" }} />
+                  <span className="text-sm text-muted-foreground">Slightly Over</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#1d4ed8" }} />
+                  <span className="text-sm text-muted-foreground">Overfunded</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#10b981" }} />
+                  <span className="text-sm text-muted-foreground">Lowest</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#84cc16" }} />
+                  <span className="text-sm text-muted-foreground">Low-Medium</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#eab308" }} />
+                  <span className="text-sm text-muted-foreground">Medium</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#f97316" }} />
+                  <span className="text-sm text-muted-foreground">High</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded" style={{ backgroundColor: "#dc2626" }} />
+                  <span className="text-sm text-muted-foreground">Highest</span>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Rankings */}
+      {/* Rankings / Typology */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
-          <CardTitle>State Rankings by {metricLabels[selectedMetric]}</CardTitle>
+          <CardTitle>
+            {metricGroup === "typology" ? "State Typology Clusters" : `State Rankings by ${metricLabels[selectedMetric]}`}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-semibold text-sm mb-3">Highest</h4>
-              <div className="space-y-2">
-                {sortedStates.slice(0, 5).map((state, idx) => (
-                  <div
-                    key={state.abbreviation}
-                    className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
-                      selectedState?.abbreviation === state.abbreviation
-                        ? "bg-primary/20"
-                        : "hover:bg-muted"
-                    }`}
-                    onClick={() => setSelectedState(state)}
-                  >
-                    <span className="text-sm">
-                      #{idx + 1} {state.abbreviation} - {state.state}
-                    </span>
-                    <span className="font-bold" style={{ color: metricColors[selectedMetric] }}>
-                      {formatMetricValue(selectedMetric, getDisplayValue(state, selectedMetric))}
-                    </span>
+          {metricGroup === "typology" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {selectedTypologySummary.map((cluster) => (
+                <div key={cluster.clusterId} className="rounded-lg border p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cluster.color }} />
+                    <div>
+                      <p className="font-semibold text-foreground">{cluster.label}</p>
+                      <p className="text-xs text-muted-foreground">{cluster.description}</p>
+                    </div>
                   </div>
-                ))}
+                  <div className="flex flex-wrap gap-2">
+                    {cluster.states.map((abbreviation) => {
+                      const state = stateData.find((entry) => entry.abbreviation === abbreviation)!;
+                      return (
+                        <button
+                          key={abbreviation}
+                          onClick={() => setSelectedState(state)}
+                          className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                            selectedState?.abbreviation === abbreviation
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          }`}
+                        >
+                          {abbreviation}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-semibold text-sm mb-3">
+                  {selectedMetric === NEED_FUNDING_GAP_METRIC ? "Most Overfunded" : "Highest"}
+                </h4>
+                <div className="space-y-2">
+                  {sortedStates.slice(0, 5).map((state, idx) => (
+                    <div
+                      key={state.abbreviation}
+                      className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                        selectedState?.abbreviation === state.abbreviation
+                          ? "bg-primary/20"
+                          : "hover:bg-muted"
+                      }`}
+                      onClick={() => setSelectedState(state)}
+                    >
+                      <span className="text-sm">
+                        #{idx + 1} {state.abbreviation} - {state.state}
+                      </span>
+                      <span className="font-bold" style={{ color: metricColors[selectedMetric] }}>
+                        {formatMetricValue(selectedMetric, getDisplayValue(state, selectedMetric))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm mb-3">
+                  {selectedMetric === NEED_FUNDING_GAP_METRIC ? "Most Underfunded" : "Lowest"}
+                </h4>
+                <div className="space-y-2">
+                  {sortedStates.slice(-5).reverse().map((state, idx) => (
+                    <div
+                      key={state.abbreviation}
+                      className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                        selectedState?.abbreviation === state.abbreviation
+                          ? "bg-primary/20"
+                          : "hover:bg-muted"
+                      }`}
+                      onClick={() => setSelectedState(state)}
+                    >
+                      <span className="text-sm">
+                        #{sortedStates.length - idx} {state.abbreviation} - {state.state}
+                      </span>
+                      <span className="font-bold" style={{ color: metricColors[selectedMetric] }}>
+                        {formatMetricValue(selectedMetric, getDisplayValue(state, selectedMetric))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            <div>
-              <h4 className="font-semibold text-sm mb-3">Lowest</h4>
-              <div className="space-y-2">
-                {sortedStates.slice(-5).reverse().map((state, idx) => (
-                  <div
-                    key={state.abbreviation}
-                    className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
-                      selectedState?.abbreviation === state.abbreviation
-                        ? "bg-primary/20"
-                        : "hover:bg-muted"
-                    }`}
-                    onClick={() => setSelectedState(state)}
-                  >
-                    <span className="text-sm">
-                      #{sortedStates.length - idx} {state.abbreviation} - {state.state}
-                    </span>
-                    <span className="font-bold" style={{ color: metricColors[selectedMetric] }}>
-                      {formatMetricValue(selectedMetric, getDisplayValue(state, selectedMetric))}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
-      {metricGroup === "financing" && (
+      {(metricGroup === "financing" || metricGroup === "needFunding" || metricGroup === "typology") && (
         <Card className="border-0 shadow-lg">
           <CardHeader>
-            <CardTitle>National Financing Trend Context</CardTitle>
+            <CardTitle>
+              {metricGroup === "financing"
+                ? "National Financing Trend Context"
+                : metricGroup === "needFunding"
+                  ? "Need-Funding Gap Validation"
+                  : "Mental Health System Typology Context"}
+            </CardTitle>
             <CardDescription>
-              Source-aligned dashboard design for annual financing comparisons across SAMHSA block grant, public mental health spending, and Medicaid financing context.
+              {metricGroup === "financing"
+                ? "Source-aligned dashboard design for annual financing comparisons across SAMHSA block grant, public mental health spending, and Medicaid financing context."
+                : metricGroup === "needFunding"
+                  ? "Regression-based validation of whether public mental health financing aligns with burden. Gap values show actual minus predicted funding given state need."
+                  : "K-means clustering groups states into comparable mental health system types using need, funding, Medicaid financing share, and provider density."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -735,6 +902,46 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
               mental health spending and funding-share values; CMS/MHBG indicates direct Medicaid expenditure and block grant components without URS-backed
               public system shares.
             </p>
+            {metricGroup === "needFunding" && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="rounded-lg bg-blue-50 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Regression Slope</p>
+                  <p className="text-lg font-bold text-foreground">${selectedNeedFundingRegression.slope}</p>
+                </div>
+                <div className="rounded-lg bg-indigo-50 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Intercept</p>
+                  <p className="text-lg font-bold text-foreground">${selectedNeedFundingRegression.intercept}</p>
+                </div>
+                <div className="rounded-lg bg-teal-50 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">R²</p>
+                  <p className="text-lg font-bold text-foreground">{selectedNeedFundingRegression.rSquared}</p>
+                </div>
+                <div className="rounded-lg bg-amber-50 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">t-statistic</p>
+                  <p className="text-lg font-bold text-foreground">{selectedNeedFundingRegression.tStatistic}</p>
+                </div>
+                <div className="rounded-lg bg-rose-50 p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Model Signal</p>
+                  <p className="text-lg font-bold text-foreground">
+                    {selectedNeedFundingRegression.significant ? "Significant" : "Weak"}
+                  </p>
+                </div>
+              </div>
+            )}
+            {metricGroup === "typology" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {selectedTypologySummary.map((cluster) => (
+                  <div key={cluster.clusterId} className="rounded-lg border p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cluster.color }} />
+                      <p className="font-semibold text-foreground">{cluster.label}</p>
+                      <span className="text-xs text-muted-foreground">{cluster.count} states</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{cluster.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={nationalFinancingTrend} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -969,6 +1176,43 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                       Source note: {selectedFinancingGapNote}
                     </div>
                   )}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Need Index</p>
+                      <p className="text-lg font-bold text-foreground">{selectedFinancingRecord.need_index}</p>
+                    </div>
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Predicted Funding</p>
+                      <p className="text-lg font-bold text-foreground">${selectedFinancingRecord.predicted_public_mh_spending_per_capita}</p>
+                      <p className="text-xs text-muted-foreground mt-1">per capita from need model</p>
+                    </div>
+                    <div className="p-3 bg-rose-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Need-Funding Gap</p>
+                      <p className="text-lg font-bold text-foreground">
+                        {formatMetricValue(NEED_FUNDING_GAP_METRIC, selectedFinancingRecord.funding_gap_per_capita)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{selectedFinancingRecord.funding_gap_percent}% vs predicted</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Average Gap</p>
+                      <p className="text-lg font-bold text-foreground">${selectedFinancingRecord.average_gap_per_capita}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{selectedFinancingRecord.gap_trend_per_year}/yr trend</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 rounded-lg">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Persistence Flag</p>
+                      <p className="text-lg font-bold text-foreground">
+                        {selectedFinancingRecord.persistent_underfunding ? "Persistent gap" : "Not persistent"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {Math.round(selectedFinancingRecord.negative_gap_years_share * 100)}% of years negative
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg" style={{ backgroundColor: `${selectedFinancingRecord.typology_cluster_color}15` }}>
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">System Typology</p>
+                      <p className="text-sm font-bold text-foreground">{selectedFinancingRecord.typology_cluster_label}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{selectedFinancingRecord.typology_cluster_description}</p>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div className="p-3 bg-blue-50 rounded-lg">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">MHBG per Capita</p>

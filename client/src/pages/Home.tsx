@@ -5,7 +5,16 @@ import { TrendingUp, Users, Heart, AlertCircle, Map } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { nationalTrendData } from "@/data/nationalTrendData";
 import { getStateResources, stateData } from "@/data/stateData";
-import { FINANCING_YEARS, getFinancingProvenanceSummary, getNationalFinancingTrend, getStateFinancingByYear } from "@/data/stateFinancingData";
+import {
+  FINANCING_YEARS,
+  getFinancingProvenanceSummary,
+  getNationalFinancingTrend,
+  getNeedFundingRegression,
+  getPersistentUnderfundingThreshold,
+  getPersistentUnderinvestmentStates,
+  getStateFinancingByYear,
+  getTypologySummaryByYear,
+} from "@/data/stateFinancingData";
 import { citationLinks, metricProvenance } from "@shared/dataProvenance";
 
 const ChoroplethMap = lazy(() => import("@/components/ChoroplethMap"));
@@ -77,6 +86,10 @@ export default function Home() {
   const latestFinancingStates = [...latestFinancingAllStates]
     .sort((a, b) => b.public_mh_spending_per_capita - a.public_mh_spending_per_capita)
     .slice(0, 12);
+  const latestNeedFundingRegression = getNeedFundingRegression(latestFinancingYear);
+  const persistentUnderinvestmentThreshold = getPersistentUnderfundingThreshold();
+  const persistentUnderinvestmentStates = getPersistentUnderinvestmentStates().slice(0, 10);
+  const latestTypologySummary = getTypologySummaryByYear(latestFinancingYear);
   const latestFinancingCoverage = latestFinancingAllStates.reduce(
     (acc, record) => {
       const summary = getFinancingProvenanceSummary(record);
@@ -592,6 +605,136 @@ export default function Home() {
                       <Bar dataKey="local_other_share_of_public_mh" stackId="funding" fill="#94a3b8" name="Local / Other Share" />
                     </BarChart>
                   </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle>Need-Funding Gap Score With Statistical Validation</CardTitle>
+                  <CardDescription>
+                    Public mental health spending is modeled as a function of state need. The gap score is actual funding minus predicted funding, so negative values indicate underfunding relative to burden.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="rounded-lg bg-blue-50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Slope</p>
+                      <p className="text-xl font-bold text-foreground">${latestNeedFundingRegression.slope}</p>
+                    </div>
+                    <div className="rounded-lg bg-indigo-50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Intercept</p>
+                      <p className="text-xl font-bold text-foreground">${latestNeedFundingRegression.intercept}</p>
+                    </div>
+                    <div className="rounded-lg bg-teal-50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">R²</p>
+                      <p className="text-xl font-bold text-foreground">{latestNeedFundingRegression.rSquared}</p>
+                    </div>
+                    <div className="rounded-lg bg-amber-50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">t-statistic</p>
+                      <p className="text-xl font-bold text-foreground">{latestNeedFundingRegression.tStatistic}</p>
+                    </div>
+                    <div className="rounded-lg bg-rose-50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">Signal</p>
+                      <p className="text-xl font-bold text-foreground">
+                        {latestNeedFundingRegression.significant ? "Need-aligned model" : "Weak model fit"}
+                      </p>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={360}>
+                    <BarChart data={persistentUnderinvestmentStates} margin={{ top: 5, right: 30, left: 0, bottom: 40 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="abbreviation" stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "average_gap_per_capita") return [`$${value}`, "Average Gap per Capita"];
+                          return [`$${value}`, "Latest Gap per Capita"];
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="average_gap_per_capita" fill="#dc2626" name="Average Gap per Capita" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="latest_gap_per_capita" fill="#1d4ed8" name="Latest Gap per Capita" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle>Persistent Mental Health System Underinvestment</CardTitle>
+                  <CardDescription>
+                    States are flagged when average need-funding gap stays below ${persistentUnderinvestmentThreshold} per capita and the gap trend is flat or worsening.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {persistentUnderinvestmentStates.map((state, index) => (
+                      <div key={state.abbreviation} className="flex items-center justify-between rounded-lg border p-4">
+                        <div>
+                          <p className="font-semibold text-foreground">
+                            #{index + 1} {state.state} ({state.abbreviation})
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {state.typology_cluster_label} • {Math.round(state.negative_gap_years_share * 100)}% of years under predicted funding
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-foreground">${state.average_gap_per_capita}</p>
+                          <p className="text-xs text-muted-foreground">{state.gap_trend_per_year}/yr trend</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle>Mental Health System Typology</CardTitle>
+                  <CardDescription>
+                    K-means clustering groups states by need, public financing, Medicaid financing share, and provider density into comparable mental health system types.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {latestTypologySummary.map((cluster) => (
+                      <div key={cluster.clusterId} className="rounded-lg border p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cluster.color }} />
+                          <p className="font-semibold text-foreground">{cluster.label}</p>
+                          <span className="text-xs text-muted-foreground">{cluster.count} states</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">{cluster.description}</p>
+                        <p className="text-xs text-muted-foreground">{cluster.states.join(", ")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-white">
+                <CardHeader>
+                  <CardTitle>Research Framing</CardTitle>
+                  <CardDescription>
+                    Policy surveillance framing for the financing and burden mismatch layer.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Primary Question</p>
+                    <p className="text-sm text-foreground">
+                      Which U.S. states exhibit persistent mismatch between mental health burden and public mental health financing?
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Secondary Questions</p>
+                    <div className="space-y-2 text-sm text-foreground">
+                      <p>1. Which states receive less funding than predicted given mental health burden?</p>
+                      <p>2. Are funding gaps persistent over time?</p>
+                      <p>3. Do states fall into distinct mental health system typologies?</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
