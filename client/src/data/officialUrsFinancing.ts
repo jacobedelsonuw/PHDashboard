@@ -3320,6 +3320,24 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
       "funding_total_millions": 1734.31,
       "admin_gap_millions": 13.32
     },
+    "2022": {
+      "state": "Washington",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 1758.13,
+      "state_expenditures_from_state_sources_millions": 585.18,
+      "total_smha_expenditures_millions": 2356.61,
+      "mhbg_millions": 21.61,
+      "covid_relief_mhbg_millions": 1.79,
+      "arp_mhbg_millions": 0.0,
+      "bsca_mhbg_millions": 0.0,
+      "medicaid_millions": 1498.06,
+      "other_federal_millions": 41.35,
+      "state_funds_millions": 201.46,
+      "local_funds_millions": 0.0,
+      "other_millions": 0.0,
+      "funding_total_millions": 1764.27,
+      "admin_gap_millions": 592.34
+    },
     "2023": {
       "state": "Washington",
       "sourceYear": 2023,

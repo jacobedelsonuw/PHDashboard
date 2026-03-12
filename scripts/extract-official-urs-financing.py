@@ -8,6 +8,18 @@ import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+try:
+    import fitz  # type: ignore
+except ImportError:
+    fitz = None
+
+try:
+    import numpy as np  # type: ignore
+    from rapidocr_onnxruntime import RapidOCR  # type: ignore
+except ImportError:
+    RapidOCR = None
+    np = None
+
 PROJECT_ROOT = Path('/Users/jacob/Downloads/Public_Health/mental-health-dashboard_2')
 OUTPUT_PATH = PROJECT_ROOT / 'client/src/data/officialUrsFinancing.ts'
 DEFAULT_YEARS = [2021, 2022, 2023, 2024]
@@ -81,6 +93,14 @@ RELEVANT_STREAM_KEYWORDS = (
     b'State Revenue Expenditure Data',
     b'Total SMHA Mental Health Expenditure',
 )
+RELEVANT_TEXT_KEYWORDS = tuple(keyword.decode('latin1', errors='ignore') for keyword in RELEVANT_STREAM_KEYWORDS)
+
+
+def normalize_pdf_text(text: str) -> str:
+    text = re.sub(r'\\([()\\])', r'\1', text)
+    text = text.replace('\\', ' ')
+    text = text.replace('\r', ' ')
+    return re.sub(r'\s+', ' ', text).strip()
 
 
 def extract_pdf_text_chunks(pdf_bytes: bytes) -> list[str]:
@@ -101,13 +121,47 @@ def extract_pdf_text_chunks(pdf_bytes: bytes) -> list[str]:
                 text_parts.append(token_match.group(1))
         if not text_parts:
             continue
-        text = ' '.join(part.decode('latin1', errors='ignore') for part in text_parts)
-        text = re.sub(r'\\([()\\])', r'\1', text)
-        text = text.replace('\\', ' ')
-        text = text.replace('\r', ' ')
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = normalize_pdf_text(' '.join(part.decode('latin1', errors='ignore') for part in text_parts))
         if text:
             chunks.append(text)
+    return chunks
+
+
+def extract_pdf_text_chunks_fitz(pdf_bytes: bytes) -> list[str]:
+    if fitz is None:
+        return []
+
+    doc = fitz.open(stream=pdf_bytes, filetype='pdf')
+    chunks: list[str] = []
+    try:
+        for page in doc:
+            text = normalize_pdf_text(page.get_text('text'))
+            if text and any(keyword in text for keyword in RELEVANT_TEXT_KEYWORDS):
+                chunks.append(text)
+    finally:
+        doc.close()
+    return chunks
+
+
+def extract_pdf_text_chunks_ocr(pdf_bytes: bytes) -> list[str]:
+    if fitz is None or RapidOCR is None or np is None:
+        return []
+
+    ocr = RapidOCR()
+    doc = fitz.open(stream=pdf_bytes, filetype='pdf')
+    chunks: list[str] = []
+    try:
+        for page in doc:
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
+            image = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+            result, _ = ocr(image)
+            if not result:
+                continue
+            text = normalize_pdf_text(' '.join(line[1] for line in result))
+            if text and any(keyword in text for keyword in RELEVANT_TEXT_KEYWORDS):
+                chunks.append(text)
+    finally:
+        doc.close()
     return chunks
 
 
@@ -313,18 +367,42 @@ def extract_state_year(state_name: str, abbreviation: str, year: int) -> tuple[s
     report_html = fetch_text(report_url)
     pdf_url = extract_pdf_url(report_html)
     pdf_bytes = fetch_bytes(pdf_url)
-    chunks = extract_pdf_text_chunks(pdf_bytes)
-    try:
-        funding_values = extract_funding_fields(chunks)
-    except ValueError:
-        funding_values = {}
-    try:
-        summary_values = extract_summary_fields(chunks)
-    except ValueError:
+    base_chunks = extract_pdf_text_chunks(pdf_bytes)
+    extraction_passes = [base_chunks]
+
+    funding_values: dict[str, float] = {}
+    summary_values: dict[str, float] | None = None
+    last_error: Exception | None = None
+    fitz_chunks: list[str] = []
+
+    for pass_index, candidate_chunks in enumerate(extraction_passes):
         try:
-            summary_values = extract_summary_fields_from_activity_table(chunks, funding_values)
+            funding_values = extract_funding_fields(candidate_chunks)
         except ValueError:
-            summary_values = extract_summary_fields_from_state_summary(chunks, year)
+            funding_values = {}
+        try:
+            summary_values = extract_summary_fields(candidate_chunks)
+        except ValueError:
+            try:
+                summary_values = extract_summary_fields_from_activity_table(candidate_chunks, funding_values)
+            except ValueError:
+                try:
+                    summary_values = extract_summary_fields_from_state_summary(candidate_chunks, year)
+                except ValueError as exc:
+                    last_error = exc
+                    if pass_index == 0:
+                        fitz_chunks = extract_pdf_text_chunks_fitz(pdf_bytes)
+                        if fitz_chunks:
+                            extraction_passes.append(base_chunks + fitz_chunks)
+                    elif pass_index == 1 and not fitz_chunks:
+                        ocr_chunks = extract_pdf_text_chunks_ocr(pdf_bytes)
+                        if ocr_chunks:
+                            extraction_passes.append(base_chunks + fitz_chunks + ocr_chunks)
+                    continue
+        break
+
+    if summary_values is None:
+        raise last_error or ValueError('Could not extract URS finance values from PDF')
     state_total = funding_values.get('funding_total_millions', 0.0) if funding_values else 0.0
     total_smha = summary_values['total_smha_expenditures_millions']
     return (
