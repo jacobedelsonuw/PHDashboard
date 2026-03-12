@@ -162,9 +162,32 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   );
   const activeYearOptions: number[] = metricGroup === "financing" ? [...FINANCING_YEARS] : nationalTrendData.map((point) => point.year);
   const selectedTrendPoint = trendByYear.get(selectedYear) ?? nationalTrendData[nationalTrendData.length - 1];
-  const financingByAbbreviation = useMemo(
-    () => new Map(getStateFinancingByYear(selectedYear as (typeof FINANCING_YEARS)[number]).map((record) => [record.abbreviation, record])),
+  const selectedFinancingRows = useMemo(
+    () => getStateFinancingByYear(selectedYear as (typeof FINANCING_YEARS)[number]),
     [selectedYear]
+  );
+  const financingByAbbreviation = useMemo(
+    () => new Map(selectedFinancingRows.map((record) => [record.abbreviation, record])),
+    [selectedFinancingRows]
+  );
+  const selectedFinancingCoverage = useMemo(
+    () =>
+      selectedFinancingRows.reduce(
+        (summary, record) => {
+          const provenance = getFinancingProvenanceSummary(record);
+          summary.total += 1;
+          summary[provenance.level] += 1;
+          return summary;
+        },
+        {
+          total: 0,
+          official_urs: 0,
+          official_cms_mhbg: 0,
+          mixed_official: 0,
+          modeled: 0,
+        }
+      ),
+    [selectedFinancingRows]
   );
   const nationalFinancingTrend = useMemo(() => getNationalFinancingTrend(), []);
   const selectedFinancingRecord = selectedState
@@ -688,7 +711,26 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
               Source-aligned dashboard design for annual financing comparisons across SAMHSA block grant, public mental health spending, and Medicaid financing context.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full bg-emerald-100 px-3 py-1 font-medium text-emerald-800">
+                mixed official: {selectedFinancingCoverage.mixed_official}
+              </span>
+              <span className="rounded-full bg-sky-100 px-3 py-1 font-medium text-sky-800">
+                URS-backed: {selectedFinancingCoverage.official_urs}
+              </span>
+              <span className="rounded-full bg-indigo-100 px-3 py-1 font-medium text-indigo-800">
+                CMS/MHBG-backed: {selectedFinancingCoverage.official_cms_mhbg}
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
+                modeled: {selectedFinancingCoverage.modeled}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Coverage snapshot for {selectedYear} across {selectedFinancingCoverage.total} state financing records. URS indicates direct SAMHSA public
+              mental health spending and funding-share values; CMS/MHBG indicates direct Medicaid expenditure and block grant components without URS-backed
+              public system shares.
+            </p>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={nationalFinancingTrend} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
