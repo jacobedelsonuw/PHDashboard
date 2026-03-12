@@ -681,36 +681,6 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
           </button>
         ))}
       </div>
-      <Card className="border-0 shadow-sm">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Map Year</p>
-              <p className="text-xs text-muted-foreground">
-                {metricGroup === "financing" || metricGroup === "needFunding" || metricGroup === "typology"
-                  ? "Adjust the choropleth by year. Financing-related map views are limited to 2020-2024 because earlier years are not shown in the public choropleth."
-                  : "Adjust the choropleth by year. Burden, resource, and gap views recalculate state-specific values from the national trend series plus state-level variation."}
-              </p>
-            </div>
-            <div className="text-2xl font-bold text-foreground">{selectedYear}</div>
-          </div>
-          <Slider
-            min={activeYearOptions[0]}
-            max={activeYearOptions[activeYearOptions.length - 1]}
-            step={1}
-            value={[selectedYear]}
-            onValueChange={(value) => setSelectedYear(value[0])}
-          />
-          <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-            {(activeYearOptions.length > 10
-              ? activeYearOptions.filter((year) => year % 4 === 0 || year === activeYearOptions[0] || year === activeYearOptions[activeYearOptions.length - 1])
-              : activeYearOptions).map((year) => (
-              <span key={year}>{year}</span>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle>US Mental Health Choropleth Map</CardTitle>
@@ -882,6 +852,36 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                 </div>
               </>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Map Year</p>
+              <p className="text-xs text-muted-foreground">
+                {metricGroup === "financing" || metricGroup === "needFunding" || metricGroup === "typology"
+                  ? "Adjust the choropleth by year. Financing-related map views are limited to 2020-2024 because earlier years are not shown in the public choropleth."
+                  : "Adjust the choropleth by year. Burden, resource, and gap views recalculate state-specific values from the national trend series plus state-level variation."}
+              </p>
+            </div>
+            <div className="text-2xl font-bold text-foreground">{selectedYear}</div>
+          </div>
+          <Slider
+            min={activeYearOptions[0]}
+            max={activeYearOptions[activeYearOptions.length - 1]}
+            step={1}
+            value={[selectedYear]}
+            onValueChange={(value) => setSelectedYear(value[0])}
+          />
+          <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+            {(activeYearOptions.length > 10
+              ? activeYearOptions.filter((year) => year % 4 === 0 || year === activeYearOptions[0] || year === activeYearOptions[activeYearOptions.length - 1])
+              : activeYearOptions).map((year) => (
+              <span key={year}>{year}</span>
+            ))}
           </div>
         </CardContent>
       </Card>
