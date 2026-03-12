@@ -1077,6 +1077,24 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
       "other_millions": 0.0,
       "funding_total_millions": 757.65,
       "admin_gap_millions": 2.17
+    },
+    "2024": {
+      "state": "Indiana",
+      "sourceYear": 2024,
+      "community_mh_expenditures_millions": 537.17,
+      "state_expenditures_from_state_sources_millions": 304.72,
+      "total_smha_expenditures_millions": 756.84,
+      "mhbg_millions": 16.45,
+      "covid_relief_mhbg_millions": 1.0,
+      "arp_mhbg_millions": 3.11,
+      "bsca_mhbg_millions": 0.0,
+      "medicaid_millions": 427.0,
+      "other_federal_millions": 3.33,
+      "state_funds_millions": 304.72,
+      "local_funds_millions": 0.0,
+      "other_millions": 0.0,
+      "funding_total_millions": 755.62,
+      "admin_gap_millions": 1.22
     }
   },
   KS: {

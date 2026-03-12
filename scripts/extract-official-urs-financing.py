@@ -76,6 +76,8 @@ RELEVANT_STREAM_KEYWORDS = (
     b'Funding Source',
     b'Mental Health Block Grant',
     b'Medicaid (Federal, State, and Local)',
+    b'Activity Expenditures',
+    b'State Mental Health Agency Controlled Expenditures for',
 )
 
 
@@ -99,6 +101,7 @@ def extract_pdf_text_chunks(pdf_bytes: bytes) -> list[str]:
             continue
         text = ' '.join(part.decode('latin1', errors='ignore') for part in text_parts)
         text = re.sub(r'\\([()\\])', r'\1', text)
+        text = text.replace('\\', ' ')
         text = text.replace('\r', ' ')
         text = re.sub(r'\s+', ' ', text).strip()
         if text:
@@ -118,6 +121,43 @@ def extract_summary_fields(chunks: list[str]) -> dict[str, float]:
         if len(values) == len(SUMMARY_PATTERNS):
             return values
     raise ValueError('Could not locate summary finance table in URS PDF')
+
+
+def extract_summary_fields_from_activity_table(chunks: list[str], funding_values: dict[str, float]) -> dict[str, float]:
+    component_labels = [
+        'Mental Health Prevention',
+        'EBPs for Early Serious Mental Illness Including First Episode Psychosis',
+        'Other 24-Hour Care',
+        'Ambulatory/Community',
+        'Crisis Services',
+    ]
+    for text in chunks:
+        if 'Activity Expenditures:' not in text or 'State Mental Health Agency Controlled Expenditures for Mental Health' not in text:
+            continue
+
+        total_match = re.search(r'Total\s+\$([0-9,]+)\s+100%', text)
+        if not total_match:
+            continue
+
+        community_total = 0.0
+        for label in component_labels:
+            match = re.search(rf'{re.escape(label)}\s+(\$[0-9,]+|-)\s+[0-9]+%|\b{re.escape(label)}\s+(\$[0-9,]+|-)', text)
+            if not match:
+                continue
+            value = next((group for group in match.groups() if group is not None), None)
+            community_total += money_to_millions(value)
+
+        if community_total <= 0:
+            continue
+
+        state_sources = round((funding_values.get('state_funds_millions', 0.0) + funding_values.get('local_funds_millions', 0.0)), 2)
+        return {
+            'community_mh_expenditures_millions': round(community_total, 2),
+            'state_expenditures_from_state_sources_millions': state_sources,
+            'total_smha_expenditures_millions': money_to_millions(total_match.group(1)),
+        }
+
+    raise ValueError('Could not locate fallback activity finance table in URS PDF')
 
 
 def extract_source_amount(table_text: str, labels_in_order: list[str], label: str) -> float:
@@ -227,8 +267,11 @@ def extract_state_year(state_name: str, abbreviation: str, year: int) -> tuple[s
     pdf_url = extract_pdf_url(report_html)
     pdf_bytes = fetch_bytes(pdf_url)
     chunks = extract_pdf_text_chunks(pdf_bytes)
-    summary_values = extract_summary_fields(chunks)
     funding_values = extract_funding_fields(chunks)
+    try:
+        summary_values = extract_summary_fields(chunks)
+    except ValueError:
+        summary_values = extract_summary_fields_from_activity_table(chunks, funding_values)
     state_total = funding_values.get('funding_total_millions', 0.0)
     total_smha = summary_values['total_smha_expenditures_millions']
     return (

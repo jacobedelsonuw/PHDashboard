@@ -7,7 +7,7 @@ import ChoroplethMap from "@/components/ChoroplethMap";
 import CountryChoroplethMap from "@/components/CountryChoroplethMap";
 import { nationalTrendData } from "@/data/nationalTrendData";
 import { getStateResources, stateData } from "@/data/stateData";
-import { FINANCING_YEARS, getNationalFinancingTrend, getStateFinancingByYear } from "@/data/stateFinancingData";
+import { FINANCING_YEARS, getFinancingProvenanceSummary, getNationalFinancingTrend, getStateFinancingByYear } from "@/data/stateFinancingData";
 import { citationLinks, metricProvenance } from "@shared/dataProvenance";
 
 // Key statistics
@@ -72,9 +72,19 @@ export default function Home() {
     .slice(0, 12);
   const latestFinancingYear = FINANCING_YEARS[FINANCING_YEARS.length - 1];
   const nationalFinancingTrend = getNationalFinancingTrend();
-  const latestFinancingStates = getStateFinancingByYear(latestFinancingYear)
+  const latestFinancingAllStates = getStateFinancingByYear(latestFinancingYear);
+  const latestFinancingStates = [...latestFinancingAllStates]
     .sort((a, b) => b.public_mh_spending_per_capita - a.public_mh_spending_per_capita)
     .slice(0, 12);
+  const latestFinancingCoverage = latestFinancingAllStates.reduce(
+    (acc, record) => {
+      const summary = getFinancingProvenanceSummary(record);
+      acc.total += 1;
+      acc[summary.level] += 1;
+      return acc;
+    },
+    { total: 0, official_urs: 0, official_cms_mhbg: 0, mixed_official: 0, modeled: 0 }
+  );
   const CORE_METRIC_TO_TREND_KEY = {
     ami: "ami",
     smi: "smi",
@@ -502,6 +512,23 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="mb-5 flex flex-wrap items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+                      {latestFinancingCoverage.mixed_official} mixed official
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                      {latestFinancingCoverage.official_urs} URS-backed
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                      {latestFinancingCoverage.official_cms_mhbg} CMS/MHBG-backed
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                      {latestFinancingCoverage.modeled} modeled
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Coverage snapshot for {latestFinancingYear} across {latestFinancingCoverage.total} state financing records.
+                    </span>
+                  </div>
                   <ResponsiveContainer width="100%" height={420}>
                     <LineChart data={nationalFinancingTrend} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -533,6 +560,9 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Source legend: `URS` = direct SAMHSA public mental health spending/share data, `CMS` = direct Medicaid expenditure totals, `MHBG` = direct block grant values, `modeled` = harmonized fallback for uncovered state-years.
+                  </p>
                   <ResponsiveContainer width="100%" height={460}>
                     <BarChart data={latestFinancingStates} margin={{ top: 5, right: 30, left: 0, bottom: 40 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
