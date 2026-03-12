@@ -44,6 +44,7 @@ import {
   getTypologyExportRows,
   getTypologySummaryByYear,
 } from "@/data/stateFinancingData";
+import type { FinancingYear } from "@/data/stateFinancingData";
 import { citationLinks, metricProvenance } from "@shared/dataProvenance";
 
 const ChoroplethMap = lazy(() => import("@/components/ChoroplethMap"));
@@ -95,6 +96,9 @@ export default function Home() {
     suicide: 0,
   });
   const [geoScope, setGeoScope] = useState<"states" | "countries">("states");
+  const [selectedFinancingAnalysisYear, setSelectedFinancingAnalysisYear] = useState<FinancingYear>(
+    FINANCING_YEARS[FINANCING_YEARS.length - 1]
+  );
   const [selectedExpansionState, setSelectedExpansionState] = useState(
     expansionTransitionStates[expansionTransitionStates.length - 1]?.abbreviation ?? "NC"
   );
@@ -120,10 +124,11 @@ export default function Home() {
     .sort((a, b) => b.public_mh_spending_per_capita - a.public_mh_spending_per_capita)
     .slice(0, 12);
   const latestNeedFundingRegression = getNeedFundingRegression(latestFinancingYear);
-  const latestNeedFundingScatter = getNeedFundingScatterSummary(latestFinancingYear);
+  const selectedNeedFundingRegression = getNeedFundingRegression(selectedFinancingAnalysisYear);
+  const selectedNeedFundingScatter = getNeedFundingScatterSummary(selectedFinancingAnalysisYear);
   const persistentUnderinvestmentThreshold = getPersistentUnderfundingThreshold();
   const persistentUnderinvestmentStates = getPersistentUnderinvestmentStates().slice(0, 10);
-  const latestTypologySummary = getTypologySummaryByYear(latestFinancingYear);
+  const selectedTypologySummary = getTypologySummaryByYear(selectedFinancingAnalysisYear);
   const expansionMismatchTrend = getExpansionMismatchTrend();
   const expansionMismatchDistribution = getExpansionMismatchDistribution(latestFinancingYear);
   const expansionEventTrend = getExpansionEventTrend();
@@ -141,8 +146,8 @@ export default function Home() {
     },
     { total: 0, official_urs: 0, official_cms_mhbg: 0, mixed_official: 0, modeled: 0 }
   );
-  const downloadCsv = (filename: string, rows: Array<Record<string, unknown>>) => {
-    if (!rows.length) return;
+  const rowsToCsv = (rows: Array<Record<string, unknown>>) => {
+    if (!rows.length) return "";
     const headers = Object.keys(rows[0]);
     const escapeCell = (value: unknown) => {
       const normalized =
@@ -154,12 +159,60 @@ export default function Home() {
       const escaped = normalized.replace(/"/g, '""');
       return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
     };
-    const csv = [headers.join(","), ...rows.map((row) => headers.map((header) => escapeCell(row[header])).join(","))].join("\n");
+    return [headers.join(","), ...rows.map((row) => headers.map((header) => escapeCell(row[header])).join(","))].join("\n");
+  };
+  const downloadCsv = (filename: string, rows: Array<Record<string, unknown>>) => {
+    if (!rows.length) return;
+    const csv = rowsToCsv(rows);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+  const downloadFinancingAnalyticsZip = async () => {
+    const [{ default: JSZip }] = await Promise.all([import("jszip")]);
+    const zip = new JSZip();
+    const gapRows = getGapScoreExportRows(selectedFinancingAnalysisYear);
+    const persistenceRows = getPersistentUnderinvestmentExportRows();
+    const typologyRows = getTypologyExportRows(selectedFinancingAnalysisYear);
+    const regressionSummary = [
+      {
+        year: selectedFinancingAnalysisYear,
+        slope: selectedNeedFundingRegression.slope,
+        intercept: selectedNeedFundingRegression.intercept,
+        r_squared: selectedNeedFundingRegression.rSquared,
+        t_statistic: selectedNeedFundingRegression.tStatistic,
+        residual_std: selectedNeedFundingRegression.residualStd,
+        sample_size: selectedNeedFundingRegression.sampleSize,
+      },
+    ];
+    zip.file(`gap-scores-${selectedFinancingAnalysisYear}.csv`, rowsToCsv(gapRows));
+    zip.file("persistent-underinvestment.csv", rowsToCsv(persistenceRows));
+    zip.file(`typology-${selectedFinancingAnalysisYear}.csv`, rowsToCsv(typologyRows));
+    zip.file(`need-funding-regression-${selectedFinancingAnalysisYear}.csv`, rowsToCsv(regressionSummary));
+    zip.file(
+      "README.txt",
+      [
+        "Mental health financing analytic export",
+        `Analysis year: ${selectedFinancingAnalysisYear}`,
+        "",
+        "Included files:",
+        `- gap-scores-${selectedFinancingAnalysisYear}.csv`,
+        "- persistent-underinvestment.csv",
+        `- typology-${selectedFinancingAnalysisYear}.csv`,
+        `- need-funding-regression-${selectedFinancingAnalysisYear}.csv`,
+      ].join("\n")
+    );
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `financing-analytics-${selectedFinancingAnalysisYear}.zip`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -682,9 +735,36 @@ export default function Home() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="financing-analysis-year" className="text-xs font-medium text-muted-foreground">
+                        Analysis year
+                      </label>
+                      <select
+                        id="financing-analysis-year"
+                        value={selectedFinancingAnalysisYear}
+                        onChange={(event) => setSelectedFinancingAnalysisYear(Number(event.target.value) as FinancingYear)}
+                        className="rounded-md border bg-background px-3 py-2 text-sm"
+                      >
+                        {FINANCING_YEARS.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      onClick={downloadFinancingAnalyticsZip}
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 transition-colors hover:bg-slate-50"
+                    >
+                      Download financing ZIP
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => downloadCsv(`gap-scores-${latestFinancingYear}.csv`, getGapScoreExportRows(latestFinancingYear))}
+                      onClick={() =>
+                        downloadCsv(`gap-scores-${selectedFinancingAnalysisYear}.csv`, getGapScoreExportRows(selectedFinancingAnalysisYear))
+                      }
                       className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800"
                     >
                       Download gap scores CSV
@@ -693,24 +773,24 @@ export default function Home() {
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div className="rounded-lg bg-blue-50 p-4">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">Slope</p>
-                      <p className="text-xl font-bold text-foreground">${latestNeedFundingRegression.slope}</p>
+                      <p className="text-xl font-bold text-foreground">${selectedNeedFundingRegression.slope}</p>
                     </div>
                     <div className="rounded-lg bg-indigo-50 p-4">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">Intercept</p>
-                      <p className="text-xl font-bold text-foreground">${latestNeedFundingRegression.intercept}</p>
+                      <p className="text-xl font-bold text-foreground">${selectedNeedFundingRegression.intercept}</p>
                     </div>
                     <div className="rounded-lg bg-teal-50 p-4">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">R²</p>
-                      <p className="text-xl font-bold text-foreground">{latestNeedFundingRegression.rSquared}</p>
+                      <p className="text-xl font-bold text-foreground">{selectedNeedFundingRegression.rSquared}</p>
                     </div>
                     <div className="rounded-lg bg-amber-50 p-4">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">t-statistic</p>
-                      <p className="text-xl font-bold text-foreground">{latestNeedFundingRegression.tStatistic}</p>
+                      <p className="text-xl font-bold text-foreground">{selectedNeedFundingRegression.tStatistic}</p>
                     </div>
                     <div className="rounded-lg bg-rose-50 p-4">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">Signal</p>
                       <p className="text-xl font-bold text-foreground">
-                        {latestNeedFundingRegression.significant ? "Need-aligned model" : "Weak model fit"}
+                        {selectedNeedFundingRegression.significant ? "Need-aligned model" : "Weak model fit"}
                       </p>
                     </div>
                   </div>
@@ -736,7 +816,7 @@ export default function Home() {
                       Need Index vs Public Mental Health Spending per Capita
                     </h3>
                     <p className="text-xs text-muted-foreground mb-4">
-                      The regression line shows expected funding given need in {latestFinancingYear}. Labeled states are the largest positive or negative outliers relative to that line.
+                      The regression line shows expected funding given need in {selectedFinancingAnalysisYear}. Labeled states are the largest positive or negative outliers relative to that line.
                     </p>
                     <ResponsiveContainer width="100%" height={340}>
                       <ComposedChart margin={{ top: 10, right: 25, left: 0, bottom: 10 }}>
@@ -762,8 +842,8 @@ export default function Home() {
                           ]}
                         />
                         <Legend />
-                        <Scatter data={latestNeedFundingScatter.points} name="States">
-                          {latestNeedFundingScatter.points.map((point) => (
+                        <Scatter data={selectedNeedFundingScatter.points} name="States">
+                          {selectedNeedFundingScatter.points.map((point) => (
                             <Cell
                               key={`${point.abbreviation}-${point.year}`}
                               fill={point.funding_gap_score >= 0 ? "#0f766e" : "#dc2626"}
@@ -771,7 +851,7 @@ export default function Home() {
                           ))}
                         </Scatter>
                         <Scatter
-                          data={latestNeedFundingScatter.outliers}
+                          data={selectedNeedFundingScatter.outliers}
                           name="Labeled outliers"
                           fill="#1d4ed8"
                         >
@@ -779,7 +859,7 @@ export default function Home() {
                         </Scatter>
                         <Line
                           type="linear"
-                          data={latestNeedFundingScatter.line}
+                          data={selectedNeedFundingScatter.line}
                           dataKey="predicted_public_mh_spending_per_capita"
                           stroke="#1d4ed8"
                           strokeWidth={2.5}
@@ -832,7 +912,7 @@ export default function Home() {
 
               <Card className="border-0 shadow-lg">
                 <CardHeader>
-                  <CardTitle>Mental Health System Typology</CardTitle>
+                  <CardTitle>{selectedFinancingAnalysisYear} Mental Health System Typology</CardTitle>
                   <CardDescription>
                     K-means clustering groups states by need, public financing, Medicaid financing share, and provider density into comparable mental health system types.
                   </CardDescription>
@@ -840,14 +920,16 @@ export default function Home() {
                 <CardContent>
                   <div className="mb-4 flex flex-wrap gap-2">
                     <button
-                      onClick={() => downloadCsv(`typology-${latestFinancingYear}.csv`, getTypologyExportRows(latestFinancingYear))}
+                      onClick={() =>
+                        downloadCsv(`typology-${selectedFinancingAnalysisYear}.csv`, getTypologyExportRows(selectedFinancingAnalysisYear))
+                      }
                       className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800"
                     >
                       Download typology CSV
                     </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {latestTypologySummary.map((cluster) => (
+                    {selectedTypologySummary.map((cluster) => (
                       <div key={cluster.clusterId} className="rounded-lg border p-4">
                         <div className="flex items-center gap-3 mb-2">
                           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cluster.color }} />
