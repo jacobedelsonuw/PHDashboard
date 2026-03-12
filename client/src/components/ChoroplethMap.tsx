@@ -14,6 +14,7 @@ import {
   FinancingMetric,
   financingMetricLabels,
   getFinancingMetricValue,
+  getFinancingProvenanceSummary,
   getStateFinancingByYear,
   getStateFinancingRecord,
   getNationalFinancingTrend,
@@ -169,6 +170,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const selectedFinancingRecord = selectedState
     ? getStateFinancingRecord(selectedState.abbreviation, selectedYear as (typeof FINANCING_YEARS)[number])
     : null;
+  const selectedFinancingProvenance = selectedFinancingRecord ? getFinancingProvenanceSummary(selectedFinancingRecord) : null;
   const selectedFinancingTrend = useMemo(
     () =>
       selectedState
@@ -402,6 +404,12 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
 
     const estimated = Math.round((state[metricKey] / 100) * state.population);
     return `${estimated.toLocaleString()} people (est.)`;
+  };
+  const provenanceTone: Record<NonNullable<typeof selectedFinancingProvenance>["level"], string> = {
+    official_urs: "bg-emerald-100 text-emerald-800",
+    official_cms_mhbg: "bg-blue-100 text-blue-800",
+    mixed_official: "bg-indigo-100 text-indigo-800",
+    modeled: "bg-amber-100 text-amber-800",
   };
 
   return (
@@ -895,11 +903,21 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
               {selectedFinancingRecord && (
                 <div className="space-y-4 my-6">
                   <h3 className="font-semibold text-lg">Mental Health Financing Snapshot ({selectedYear})</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedFinancingRecord.financing_data_status === "partially_official"
-                      ? "Uses direct SAMHSA MHBG, SAMHSA URS, and CMS Financial Management Report inputs where available for this year, with modeled fallbacks for the remaining financing context."
-                      : "This year is still shown from the harmonized financing model pending additional direct official financing extracts."}
-                  </p>
+                  {selectedFinancingProvenance && (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${provenanceTone[selectedFinancingProvenance.level]}`}>
+                          {selectedFinancingProvenance.label}
+                        </span>
+                        {selectedFinancingProvenance.badges.map((badge) => (
+                          <span key={badge} className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                            {badge}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{selectedFinancingProvenance.note}</p>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div className="p-3 bg-blue-50 rounded-lg">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">MHBG per Capita</p>
@@ -979,6 +997,9 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                       ) : null}
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Footnote: `URS` indicates direct SAMHSA public mental health spending and financing-share data for this state-year. `CMS` indicates direct Medicaid expenditure totals from the CMS Financial Management Report. `MHBG` indicates direct SAMHSA Community Mental Health Block Grant values. `Modeled` indicates the harmonized fallback layer where official extracts are not yet available.
+                  </p>
                 </div>
               )}
 

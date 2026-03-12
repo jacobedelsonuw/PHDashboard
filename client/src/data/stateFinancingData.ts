@@ -45,6 +45,15 @@ export interface StateFinancingRecord {
   behavioral_health_policy_score: number;
 }
 
+export type FinancingProvenanceLevel = "official_urs" | "official_cms_mhbg" | "mixed_official" | "modeled";
+
+export interface FinancingProvenanceSummary {
+  level: FinancingProvenanceLevel;
+  label: string;
+  badges: string[];
+  note: string;
+}
+
 export const financingMetricLabels: Record<FinancingMetric, string> = {
   mhbg_per_capita: "MHBG Funding per Capita ($)",
   federal_mental_health_funding_per_capita: "Federal Mental Health Funding per Capita ($)",
@@ -208,6 +217,47 @@ export const getStateFinancingByYear = (year: FinancingYear) =>
   stateFinancingData.filter((entry) => entry.year === year);
 
 export const getFinancingMetricValue = (record: StateFinancingRecord, metric: FinancingMetric) => record[metric];
+
+export const getFinancingProvenanceSummary = (record: StateFinancingRecord): FinancingProvenanceSummary => {
+  const hasUrs = typeof record.official_urs_total_smha_expenditures_millions === "number";
+  const hasCms = typeof record.official_cms_total_net_expenditures_millions === "number";
+  const hasMhbg =
+    typeof record.official_mhbg_formula_millions === "number" || typeof record.official_mhbg_supplemental_millions === "number";
+
+  if (hasUrs && (hasCms || hasMhbg)) {
+    return {
+      level: "mixed_official",
+      label: "Official URS + CMS/MHBG",
+      badges: ["URS", ...(hasCms ? ["CMS"] : []), ...(hasMhbg ? ["MHBG"] : [])],
+      note: "Public mental health spending and funding-source shares are direct URS values; Medicaid expenditure and federal grant components also use official CMS and/or MHBG files where available.",
+    };
+  }
+
+  if (hasUrs) {
+    return {
+      level: "official_urs",
+      label: "Official URS-backed",
+      badges: ["URS"],
+      note: "This state-year uses direct SAMHSA URS public mental health spending and funding-share values. Components not covered by URS may still use the dashboard's financing model.",
+    };
+  }
+
+  if (hasCms || hasMhbg) {
+    return {
+      level: "official_cms_mhbg",
+      label: "Official CMS/MHBG-backed",
+      badges: [...(hasCms ? ["CMS"] : []), ...(hasMhbg ? ["MHBG"] : [])],
+      note: "This state-year uses direct CMS Medicaid expenditure and/or SAMHSA MHBG grant values, while public mental health spending shares still rely on the harmonized financing model.",
+    };
+  }
+
+  return {
+    level: "modeled",
+    label: "Modeled fallback",
+    badges: ["Modeled"],
+    note: "No direct official financing extract is currently wired for this state-year, so the dashboard is showing the harmonized modeled financing layer.",
+  };
+};
 
 export const getNationalFinancingTrend = () =>
   FINANCING_YEARS.map((year) => {
