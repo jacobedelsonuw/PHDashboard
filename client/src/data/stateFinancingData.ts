@@ -1,4 +1,5 @@
 import { getStateResources, stateData } from "./stateData";
+import { officialMhbgAwardsByStateYear } from "./officialMhbgAwards";
 
 export const FINANCING_YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024] as const;
 export type FinancingYear = (typeof FINANCING_YEARS)[number];
@@ -20,6 +21,9 @@ export interface StateFinancingRecord {
   year: FinancingYear;
   mhbg_allotment_millions: number;
   federal_mental_health_funding_millions: number;
+  official_mhbg_formula_millions?: number;
+  official_mhbg_supplemental_millions?: number;
+  financing_data_status: "modeled" | "partially_official";
   public_mh_spending_millions: number;
   medicaid_total_expenditures_millions: number;
   medicaid_enrollment: number;
@@ -93,10 +97,23 @@ export const stateFinancingData: StateFinancingRecord[] = FINANCING_YEARS.flatMa
       (1.35 + populationMillions * 0.68 + needIndex * 2.2 + treatmentIndex * 0.6) * federalGrowth,
       2
     );
-    const federalMentalHealthFundingMillions = round(
+    const modeledFederalMentalHealthFundingMillions = round(
       mhbgAllotmentMillions * (1.85 + needIndex * 0.18 + treatmentIndex * 0.08),
       2
     );
+    const officialMhbg = officialMhbgAwardsByStateYear[state.abbreviation]?.[year as 2021 | 2022 | 2023];
+    const officialMhbgFormulaMillions = officialMhbg?.formula_allotment_millions;
+    const officialMhbgSupplementalMillions = round(
+      (officialMhbg?.bsca_award_millions ?? 0) +
+        (officialMhbg?.covid_supplemental_award_millions ?? 0) +
+        (officialMhbg?.arp_supplemental_award_millions ?? 0) +
+        (officialMhbg?.arp_testing_mitigation_award_millions ?? 0),
+      2
+    );
+    const federalMentalHealthFundingMillions =
+      officialMhbg && (officialMhbgFormulaMillions || officialMhbgSupplementalMillions)
+        ? round((officialMhbgFormulaMillions ?? 0) + officialMhbgSupplementalMillions, 2)
+        : modeledFederalMentalHealthFundingMillions;
     const publicMhSpendingMillions = round(
       populationMillions * (155 + needIndex * 78 + policyScore * 1.15) * spendingGrowth,
       2
@@ -122,8 +139,11 @@ export const stateFinancingData: StateFinancingRecord[] = FINANCING_YEARS.flatMa
       state: state.state,
       abbreviation: state.abbreviation,
       year,
-      mhbg_allotment_millions: mhbgAllotmentMillions,
+      mhbg_allotment_millions: officialMhbgFormulaMillions ?? mhbgAllotmentMillions,
       federal_mental_health_funding_millions: federalMentalHealthFundingMillions,
+      official_mhbg_formula_millions: officialMhbgFormulaMillions,
+      official_mhbg_supplemental_millions: officialMhbgSupplementalMillions || undefined,
+      financing_data_status: officialMhbg ? "partially_official" : "modeled",
       public_mh_spending_millions: publicMhSpendingMillions,
       medicaid_total_expenditures_millions: medicaidTotalExpendituresMillions,
       medicaid_enrollment: medicaidEnrollment,
@@ -132,7 +152,7 @@ export const stateFinancingData: StateFinancingRecord[] = FINANCING_YEARS.flatMa
       state_share_of_public_mh: stateShare,
       other_federal_share_of_public_mh: otherFederalShare,
       local_other_share_of_public_mh: localOtherShare,
-      mhbg_per_capita: round((mhbgAllotmentMillions * 1_000_000) / state.population, 2),
+      mhbg_per_capita: round(((officialMhbgFormulaMillions ?? mhbgAllotmentMillions) * 1_000_000) / state.population, 2),
       federal_mental_health_funding_per_capita: round((federalMentalHealthFundingMillions * 1_000_000) / state.population, 2),
       public_mh_spending_per_capita: round((publicMhSpendingMillions * 1_000_000) / state.population, 2),
       behavioral_health_policy_score: policyScore,

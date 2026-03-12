@@ -11,7 +11,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "sources:check": "node scripts/check-source-catalog.mjs",
-    "sources:extract": "node scripts/extract-official-nsduh-state-metrics.mjs && node scripts/extract-official-cdc-suicide-rates.mjs && node scripts/extract-official-resource-capacity.mjs"
+    "sources:extract": "node scripts/extract-official-nsduh-state-metrics.mjs && node scripts/extract-official-cdc-suicide-rates.mjs && node scripts/extract-official-resource-capacity.mjs && node scripts/extract-official-mhbg-awards.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

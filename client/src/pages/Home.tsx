@@ -5,34 +5,10 @@ import { TrendingUp, Users, Heart, AlertCircle, Map } from "lucide-react";
 import { useEffect, useState } from "react";
 import ChoroplethMap from "@/components/ChoroplethMap";
 import CountryChoroplethMap from "@/components/CountryChoroplethMap";
+import { nationalTrendData } from "@/data/nationalTrendData";
 import { getStateResources, stateData } from "@/data/stateData";
 import { FINANCING_YEARS, getNationalFinancingTrend, getStateFinancingByYear } from "@/data/stateFinancingData";
 import { citationLinks, metricProvenance } from "@shared/dataProvenance";
-
-// Mental health trend data from 2004-2024
-const trendData = [
-  { year: 2004, ami: 18.0, smi: 4.3, suicide: 11.0, mde_youth: 8.7 },
-  { year: 2005, ami: 18.1, smi: 4.2, suicide: 10.9, mde_youth: 8.8 },
-  { year: 2006, ami: 18.0, smi: 4.1, suicide: 11.0, mde_youth: 8.5 },
-  { year: 2007, ami: 18.1, smi: 4.0, suicide: 11.3, mde_youth: 8.2 },
-  { year: 2008, ami: 17.7, smi: 3.7, suicide: 11.6, mde_youth: 8.3 },
-  { year: 2009, ami: 18.1, smi: 4.0, suicide: 11.8, mde_youth: 8.1 },
-  { year: 2010, ami: 18.1, smi: 4.1, suicide: 12.1, mde_youth: 8.0 },
-  { year: 2011, ami: 17.8, smi: 3.9, suicide: 12.3, mde_youth: 8.2 },
-  { year: 2012, ami: 18.6, smi: 4.1, suicide: 12.6, mde_youth: 9.1 },
-  { year: 2013, ami: 18.5, smi: 4.2, suicide: 12.6, mde_youth: 10.7 },
-  { year: 2014, ami: 18.1, smi: 4.1, suicide: 13.0, mde_youth: 11.4 },
-  { year: 2015, ami: 17.9, smi: 4.0, suicide: 13.3, mde_youth: 12.5 },
-  { year: 2016, ami: 18.3, smi: 4.2, suicide: 13.5, mde_youth: 12.8 },
-  { year: 2017, ami: 18.9, smi: 4.5, suicide: 14.0, mde_youth: 13.3 },
-  { year: 2018, ami: 19.1, smi: 4.6, suicide: 14.2, mde_youth: 14.4 },
-  { year: 2019, ami: 20.6, smi: 5.2, suicide: 13.9, mde_youth: 15.7 },
-  { year: 2020, ami: 21.0, smi: 5.6, suicide: 13.5, mde_youth: 17.0 },
-  { year: 2021, ami: 22.8, smi: 5.5, suicide: 14.1, mde_youth: 20.1 },
-  { year: 2022, ami: 23.1, smi: 6.0, suicide: 14.4, mde_youth: 19.5 },
-  { year: 2023, ami: 22.8, smi: 5.7, suicide: 14.3, mde_youth: 19.8 },
-  { year: 2024, ami: 23.4, smi: 5.6, suicide: 14.5, mde_youth: 20.2 },
-];
 
 // Key statistics
 const stats = [
@@ -71,6 +47,7 @@ const stats = [
 ];
 
 export default function Home() {
+  const trendData = [...nationalTrendData];
   const [animatedValues, setAnimatedValues] = useState({
     ami: 0,
     smi: 0,
@@ -311,7 +288,7 @@ export default function Home() {
             Explore how mental health indicators have evolved in the United States from 2004 to 2024.
           </p>
           <p className="text-sm text-muted-foreground mt-3">
-            National trend lines are aligned to official U.S. sources listed below. State AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, opioid use disorder, suicide mortality, and resource availability now use official federal source files; the new financing layer combines SAMHSA MHBG, URS, CMS Medicaid expenditure reporting, and KFF policy context into an annual state comparison view. Country comparisons, burden-resource gap scoring, and the remaining disorder layers are still mixed or modeled.
+            National trend lines are aligned to official U.S. sources listed below. State AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, opioid use disorder, suicide mortality, and resource availability now use official federal source files; the financing layer now incorporates direct SAMHSA MHBG award tables for published years and combines them with URS, CMS Medicaid expenditure reporting, and KFF policy context into an annual state comparison view. Country comparisons, burden-resource gap scoring, and the remaining disorder layers are still mixed or modeled.
           </p>
         </div>
 
@@ -754,7 +731,7 @@ export default function Home() {
               </div>
             ))}
             <p className="text-sm text-muted-foreground">
-              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS; and the financing layer combines SAMHSA MHBG, SAMHSA URS, CMS Medicaid expenditure reporting, and KFF policy context into a harmonized state-year comparison view. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
+              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS; and the financing layer now uses direct SAMHSA MHBG award tables for FY2021-FY2023 while still harmonizing URS, CMS Medicaid expenditure reporting, and KFF policy context for the broader state-year comparison view. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
             </p>
             <div className="pt-2">
               <h4 className="font-semibold text-foreground mb-3">Metric Provenance Status</h4>

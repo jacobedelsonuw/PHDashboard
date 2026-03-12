@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
-import { stateData, generateForecast, getStateResources, getMetricColor, StateData } from "@/data/stateData";
+import { stateData, generateForecast, getStateResources, StateData } from "@/data/stateData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
@@ -12,13 +12,13 @@ import {
   FINANCING_METRICS,
   FINANCING_YEARS,
   FinancingMetric,
-  FinancingYear,
   financingMetricLabels,
   getFinancingMetricValue,
   getStateFinancingByYear,
   getStateFinancingRecord,
   getNationalFinancingTrend,
 } from "@/data/stateFinancingData";
+import { nationalTrendData } from "@/data/nationalTrendData";
 import "leaflet/dist/leaflet.css";
 
 interface ChoroplethMapProps {
@@ -69,7 +69,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const [hoveredState, setHoveredState] = useState<StateData | null>(null);
   const [selectedState, setSelectedState] = useState<StateData | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<Metric>(metric);
-  const [selectedYear, setSelectedYear] = useState<FinancingYear>(FINANCING_YEARS[FINANCING_YEARS.length - 1]);
+  const [selectedYear, setSelectedYear] = useState<number>(nationalTrendData[nationalTrendData.length - 1].year);
   const [metricGroup, setMetricGroup] = useState<MetricGroup>(
     (RESOURCE_METRICS as readonly string[]).includes(metric)
       ? "resources"
@@ -155,13 +155,19 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
       ),
     []
   );
+  const trendByYear = useMemo<Map<number, (typeof nationalTrendData)[number]>>(
+    () => new Map(nationalTrendData.map((point) => [point.year, point])),
+    []
+  );
+  const activeYearOptions: number[] = metricGroup === "financing" ? [...FINANCING_YEARS] : nationalTrendData.map((point) => point.year);
+  const selectedTrendPoint = trendByYear.get(selectedYear) ?? nationalTrendData[nationalTrendData.length - 1];
   const financingByAbbreviation = useMemo(
-    () => new Map(getStateFinancingByYear(selectedYear).map((record) => [record.abbreviation, record])),
+    () => new Map(getStateFinancingByYear(selectedYear as (typeof FINANCING_YEARS)[number]).map((record) => [record.abbreviation, record])),
     [selectedYear]
   );
   const nationalFinancingTrend = useMemo(() => getNationalFinancingTrend(), []);
   const selectedFinancingRecord = selectedState
-    ? getStateFinancingRecord(selectedState.abbreviation, selectedYear)
+    ? getStateFinancingRecord(selectedState.abbreviation, selectedYear as (typeof FINANCING_YEARS)[number])
     : null;
   const selectedFinancingTrend = useMemo(
     () =>
@@ -170,9 +176,34 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         : [],
     [selectedState]
   );
+  const roundMetricValue = (metricKey: MentalMetric | ResourceMetric, value: number) =>
+    metricKey === "suicide_rate" || metricKey === "crisis_centers_per_million"
+      ? Math.round(value * 10) / 10
+      : Math.round(value * 100) / 100;
+  const getMentalAdjustment = (metricKey: MentalMetric) => {
+    switch (metricKey) {
+      case "ami":
+        return selectedTrendPoint.ami / 23.4;
+      case "smi":
+        return selectedTrendPoint.smi / 5.6;
+      case "mde_youth":
+        return selectedTrendPoint.mde_youth / 20.2;
+      case "mde_adult":
+        return (selectedTrendPoint.ami / 23.4 + selectedTrendPoint.mde_youth / 20.2) / 2;
+      case "suicide_rate":
+        return selectedTrendPoint.suicide / 14.5;
+      default:
+        return selectedTrendPoint.ami / 23.4;
+    }
+  };
+  const getResourceAdjustment = () => {
+    const progress = (selectedYear - nationalTrendData[0].year) / (nationalTrendData[nationalTrendData.length - 1].year - nationalTrendData[0].year);
+    return 0.74 + Math.max(0, Math.min(1, progress)) * 0.26;
+  };
   const getMetricValue = (state: StateData, metricKey: Metric): number => {
     if ((MENTAL_METRICS as readonly string[]).includes(metricKey)) {
-      return state[metricKey as MentalMetric];
+      const typedMetric = metricKey as MentalMetric;
+      return roundMetricValue(typedMetric, state[typedMetric] * getMentalAdjustment(typedMetric));
     }
     if ((FINANCING_METRICS as readonly string[]).includes(metricKey)) {
       const financingRecord = financingByAbbreviation.get(state.abbreviation);
@@ -183,19 +214,24 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
 
     switch (metricKey) {
       case "providers_per_100k":
-        return Math.round((resources.mental_health_providers / state.population) * 100000 * 10) / 10;
+        return roundMetricValue(metricKey, (resources.mental_health_providers / state.population) * 100000 * getResourceAdjustment());
       case "psychiatrists_per_100k":
-        return Math.round((resources.psychiatrists / state.population) * 100000 * 10) / 10;
+        return roundMetricValue(metricKey, (resources.psychiatrists / state.population) * 100000 * getResourceAdjustment());
       case "therapists_per_100k":
-        return Math.round((resources.therapists / state.population) * 100000 * 10) / 10;
+        return roundMetricValue(metricKey, (resources.therapists / state.population) * 100000 * getResourceAdjustment());
       case "crisis_centers_per_million":
-        return Math.round((resources.crisis_centers / state.population) * 1000000 * 10) / 10;
+        return roundMetricValue(metricKey, (resources.crisis_centers / state.population) * 1000000 * getResourceAdjustment());
       default:
         return 0;
     }
   };
   const normalize = (value: number, min: number, max: number) =>
     max === min ? 0.5 : (value - min) / (max - min);
+  useEffect(() => {
+    if (!activeYearOptions.includes(selectedYear)) {
+      setSelectedYear(activeYearOptions[activeYearOptions.length - 1]);
+    }
+  }, [activeYearOptions, selectedYear]);
   const burdenMetricsForGap: readonly MentalMetric[] = [
     "ami",
     "smi",
@@ -212,6 +248,14 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     "eating_disorder",
     "adhd",
   ];
+  const mentalRangeByMetric = useMemo(() => {
+    const ranges: Partial<Record<MentalMetric, { min: number; max: number }>> = {};
+    MENTAL_METRICS.forEach((mentalMetric) => {
+      const values = stateData.map((state) => getMetricValue(state, mentalMetric));
+      ranges[mentalMetric] = { min: Math.min(...values), max: Math.max(...values) };
+    });
+    return ranges as Record<MentalMetric, { min: number; max: number }>;
+  }, [selectedYear]);
   const resourceRangeByMetric = useMemo(() => {
     const ranges: Partial<Record<ResourceMetric, { min: number; max: number }>> = {};
     RESOURCE_METRICS.forEach((resourceMetric) => {
@@ -219,7 +263,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
       ranges[resourceMetric] = { min: Math.min(...values), max: Math.max(...values) };
     });
     return ranges as Record<ResourceMetric, { min: number; max: number }>;
-  }, [resourcesByAbbreviation]);
+  }, [resourcesByAbbreviation, selectedYear]);
   const financingRangeByMetric = useMemo(() => {
     const ranges: Partial<Record<FinancingMetric, { min: number; max: number }>> = {};
     FINANCING_METRICS.forEach((financingMetric) => {
@@ -267,7 +311,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         return [state.abbreviation, Math.round((burdenScore - resourceScore) * 100) / 100] as const;
       })
     );
-  }, [resourceRangeByMetric]);
+  }, [resourceRangeByMetric, selectedYear]);
   const gapRange = useMemo(() => {
     const values = Array.from(burdenGapByAbbreviation.values());
     return { min: Math.min(...values), max: Math.max(...values) };
@@ -286,7 +330,11 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
       return `hsl(${hue}, 75%, ${lightness}%)`;
     }
     if ((MENTAL_METRICS as readonly string[]).includes(metricKey)) {
-      return getMetricColor(metricKey, value);
+      const { min, max } = mentalRangeByMetric[metricKey as MentalMetric];
+      if (max === min) return "#84cc16";
+      const normalized = (value - min) / (max - min);
+      const hue = (1 - normalized) * 120;
+      return `hsl(${hue}, 70%, 50%)`;
     }
     if ((FINANCING_METRICS as readonly string[]).includes(metricKey)) {
       const { min, max } = financingRangeByMetric[metricKey as FinancingMetric];
@@ -363,6 +411,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         <button
           onClick={() => {
             setMetricGroup("conditions");
+            setSelectedYear(nationalTrendData[nationalTrendData.length - 1].year);
             if (!(MENTAL_METRICS as readonly string[]).includes(selectedMetric)) {
               setSelectedMetric("ami");
             }
@@ -378,6 +427,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         <button
           onClick={() => {
             setMetricGroup("resources");
+            setSelectedYear(nationalTrendData[nationalTrendData.length - 1].year);
             if (!(RESOURCE_METRICS as readonly string[]).includes(selectedMetric)) {
               setSelectedMetric("providers_per_100k");
             }
@@ -393,6 +443,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         <button
           onClick={() => {
             setMetricGroup("financing");
+            setSelectedYear(FINANCING_YEARS[FINANCING_YEARS.length - 1]);
             if (!(FINANCING_METRICS as readonly string[]).includes(selectedMetric)) {
               setSelectedMetric("mhbg_per_capita");
             }
@@ -408,6 +459,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         <button
           onClick={() => {
             setMetricGroup("gap");
+            setSelectedYear(nationalTrendData[nationalTrendData.length - 1].year);
             setSelectedMetric(GAP_METRIC);
           }}
           className={`px-4 py-2 rounded-lg font-medium transition-all ${
@@ -444,22 +496,24 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between gap-4 mb-4">
             <div>
-              <p className="text-sm font-semibold text-foreground">Financing Year</p>
+              <p className="text-sm font-semibold text-foreground">Map Year</p>
               <p className="text-xs text-muted-foreground">
-                The year slider controls annual financing and Medicaid financing views. Current year: {selectedYear}
+                Adjust the choropleth by year. Financing uses annual state financing records; burden, resource, and gap views scale state baselines against the national trend series.
               </p>
             </div>
             <div className="text-2xl font-bold text-foreground">{selectedYear}</div>
           </div>
           <Slider
-            min={FINANCING_YEARS[0]}
-            max={FINANCING_YEARS[FINANCING_YEARS.length - 1]}
+            min={activeYearOptions[0]}
+            max={activeYearOptions[activeYearOptions.length - 1]}
             step={1}
             value={[selectedYear]}
-            onValueChange={(value) => setSelectedYear(value[0] as FinancingYear)}
+            onValueChange={(value) => setSelectedYear(value[0])}
           />
           <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-            {FINANCING_YEARS.map((year) => (
+            {(activeYearOptions.length > 10
+              ? activeYearOptions.filter((year) => year % 4 === 0 || year === activeYearOptions[0] || year === activeYearOptions[activeYearOptions.length - 1])
+              : activeYearOptions).map((year) => (
               <span key={year}>{year}</span>
             ))}
           </div>
@@ -841,6 +895,11 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
               {selectedFinancingRecord && (
                 <div className="space-y-4 my-6">
                   <h3 className="font-semibold text-lg">Mental Health Financing Snapshot ({selectedYear})</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedFinancingRecord.financing_data_status === "partially_official"
+                      ? "Uses direct SAMHSA MHBG award/allotment tables where available for this year, with the remaining financing context harmonized from the project financing model."
+                      : "This year is still shown from the harmonized financing model pending direct URS/CMS ETL."}
+                  </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div className="p-3 bg-blue-50 rounded-lg">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">MHBG per Capita</p>
