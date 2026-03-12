@@ -69,6 +69,16 @@ def money_to_millions(raw: str | None) -> float:
     return round(int(raw.replace('$', '').replace(',', '')) / 1_000_000, 2)
 
 
+RELEVANT_STREAM_KEYWORDS = (
+    b'State Expenditures from State Sources',
+    b'Total SMHA Expenditures',
+    b'SMHA Expenditures for Community Mental Health',
+    b'Funding Source',
+    b'Mental Health Block Grant',
+    b'Medicaid (Federal, State, and Local)',
+)
+
+
 def extract_pdf_text_chunks(pdf_bytes: bytes) -> list[str]:
     chunks: list[str] = []
     for match in re.finditer(rb'stream\r?\n(.*?)endstream', pdf_bytes, re.S):
@@ -76,6 +86,8 @@ def extract_pdf_text_chunks(pdf_bytes: bytes) -> list[str]:
         try:
             decompressed = zlib.decompress(stream)
         except Exception:
+            continue
+        if not any(keyword in decompressed for keyword in RELEVANT_STREAM_KEYWORDS):
             continue
         text_parts = []
         for token_match in re.finditer(rb'\((.*?)\)\s*Tj', decompressed, re.S):
@@ -128,19 +140,35 @@ def extract_source_amount(table_text: str, labels_in_order: list[str], label: st
         end = min(end, notes_index)
 
     segment = table_text[start:end]
-    amounts = re.findall(r'\$[0-9,]+', segment)
-    if not amounts:
-        return 0.0
-    if len(amounts) >= 4:
-        community_amount = amounts[0]
-        hospital_amount = amounts[2]
-    elif len(amounts) >= 2:
-        community_amount = amounts[0]
-        hospital_amount = amounts[1]
-    else:
-        community_amount = amounts[0]
-        hospital_amount = '-'
-    return round(money_to_millions(community_amount) + money_to_millions(hospital_amount), 2)
+    money_or_dash = r'(\$[0-9,]+|-)'
+    percent_or_dash = r'([0-9.]+%|-)'
+
+    # 2024-style rows include both state and U.S. dollar columns plus states-reporting counts.
+    expanded_match = re.search(
+        rf'{re.escape(label)}\s+{money_or_dash}\s+{percent_or_dash}\s+{money_or_dash}\s+{percent_or_dash}\s+\d+\s+{money_or_dash}\s+{percent_or_dash}\s+{money_or_dash}\s+{percent_or_dash}\s+\d+',
+        segment,
+    )
+    if expanded_match:
+        community_amount = expanded_match.group(1)
+        hospital_amount = expanded_match.group(5)
+        return round(money_to_millions(community_amount) + money_to_millions(hospital_amount), 2)
+
+    # 2021-2023-style rows include only state dollar columns and percentages.
+    compact_match = re.search(
+        rf'{re.escape(label)}\s+{money_or_dash}\s+{percent_or_dash}\s+{percent_or_dash}\s+{money_or_dash}\s+{percent_or_dash}\s+{percent_or_dash}',
+        segment,
+    )
+    if compact_match:
+        community_amount = compact_match.group(1)
+        hospital_amount = compact_match.group(4)
+        return round(money_to_millions(community_amount) + money_to_millions(hospital_amount), 2)
+
+    # Some rows have only one state dollar amount and no hospital amount.
+    single_amount_match = re.search(rf'{re.escape(label)}\s+{money_or_dash}', segment)
+    if single_amount_match:
+        return money_to_millions(single_amount_match.group(1))
+
+    return 0.0
 
 
 def extract_funding_fields(chunks: list[str]) -> dict[str, float]:
@@ -216,21 +244,6 @@ def extract_state_year(state_name: str, abbreviation: str, year: int) -> tuple[s
     )
 
 
-records: dict[str, dict[int, dict[str, float | int | str]]] = {}
-years = parse_years()
-states = load_states()
-state_filter = parse_state_filter()
-
-for year in years:
-    selected_states = [(state_name, abbreviation) for state_name, abbreviation in states if not state_filter or abbreviation in state_filter]
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = [executor.submit(extract_state_year, state_name, abbreviation, year) for state_name, abbreviation in selected_states]
-        for future in as_completed(futures):
-            abbreviation, completed_year, record = future.result()
-            records.setdefault(abbreviation, {})[completed_year] = record
-            print(f'Parsed URS {completed_year} {abbreviation}', flush=True)
-
-
 type_definition = '''export interface OfficialUrsFinancingRecord {
   state: string;
   sourceYear: number;
@@ -254,19 +267,53 @@ export type OfficialUrsFinancingByYear = Partial<Record<2021 | 2022 | 2023 | 202
 
 '''
 
-serialized = ',\n'.join(
-    f"  {abbr}: {json.dumps(records[abbr], indent=2)}".replace('\n', '\n  ')
-    for abbr in sorted(records)
-)
 
-output = (
-    '// Auto-generated from official SAMHSA URS state report pages and PDFs\n'
-    '// This extraction is network-backed because the URS PDFs are fetched from the official SAMHSA state report pages at generation time.\n\n'
-    + type_definition
-    + 'export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancingByYear> = {\n'
-    + serialized
-    + '\n};\n'
-)
+def main() -> None:
+    records: dict[str, dict[int, dict[str, float | int | str]]] = {}
+    failures: list[tuple[int, str, str]] = []
+    years = parse_years()
+    states = load_states()
+    state_filter = parse_state_filter()
 
-OUTPUT_PATH.write_text(output)
-print(f'Wrote {OUTPUT_PATH} with {len(records)} states across {sum(len(years) for years in records.values())} state-year records.')
+    for year in years:
+        selected_states = [(state_name, abbreviation) for state_name, abbreviation in states if not state_filter or abbreviation in state_filter]
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(extract_state_year, state_name, abbreviation, year): (state_name, abbreviation)
+                for state_name, abbreviation in selected_states
+            }
+            for future in as_completed(futures):
+                state_name, abbreviation = futures[future]
+                try:
+                    _, completed_year, record = future.result()
+                except Exception as exc:
+                    failures.append((year, abbreviation, str(exc)))
+                    print(f'Failed URS {year} {abbreviation}: {exc}', flush=True)
+                    continue
+                records.setdefault(abbreviation, {})[completed_year] = record
+                print(f'Parsed URS {completed_year} {abbreviation}', flush=True)
+
+    serialized = ',\n'.join(
+        f"  {abbr}: {json.dumps(records[abbr], indent=2)}".replace('\n', '\n  ')
+        for abbr in sorted(records)
+    )
+
+    output = (
+        '// Auto-generated from official SAMHSA URS state report pages and PDFs\n'
+        '// This extraction is network-backed because the URS PDFs are fetched from the official SAMHSA state report pages at generation time.\n\n'
+        + type_definition
+        + 'export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancingByYear> = {\n'
+        + serialized
+        + '\n};\n'
+    )
+
+    OUTPUT_PATH.write_text(output)
+    print(f'Wrote {OUTPUT_PATH} with {len(records)} states across {sum(len(years) for years in records.values())} state-year records.')
+    if failures:
+        print('Failures:', flush=True)
+        for year, abbreviation, error in failures:
+            print(f'  {year} {abbreviation}: {error}', flush=True)
+
+
+if __name__ == "__main__":
+    main()

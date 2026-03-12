@@ -897,7 +897,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                   <h3 className="font-semibold text-lg">Mental Health Financing Snapshot ({selectedYear})</h3>
                   <p className="text-sm text-muted-foreground">
                     {selectedFinancingRecord.financing_data_status === "partially_official"
-                      ? "Uses direct SAMHSA MHBG and CMS Financial Management Report inputs where available for this year, with modeled fallbacks for the remaining financing context."
+                      ? "Uses direct SAMHSA MHBG, SAMHSA URS, and CMS Financial Management Report inputs where available for this year, with modeled fallbacks for the remaining financing context."
                       : "This year is still shown from the harmonized financing model pending additional direct official financing extracts."}
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -914,7 +914,10 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                     <div className="p-3 bg-teal-50 rounded-lg">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">Public MH Spending</p>
                       <p className="text-lg font-bold text-foreground">{formatMetricValue("public_mh_spending_per_capita", selectedFinancingRecord.public_mh_spending_per_capita)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">${selectedFinancingRecord.public_mh_spending_millions.toLocaleString()}M total</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ${selectedFinancingRecord.public_mh_spending_millions.toLocaleString()}M total
+                        {selectedFinancingRecord.official_urs_total_smha_expenditures_millions ? " (URS)" : ""}
+                      </p>
                     </div>
                     <div className="p-3 bg-cyan-50 rounded-lg">
                       <p className="text-xs font-semibold text-muted-foreground mb-1">Medicaid per Enrollee</p>

@@ -31,6 +31,7 @@ Important:
   - `SAMHSA MHBG` award/allotment tables already stored under `raw/official/financing`
   - `CMS Financial Management Report` annual zip workbooks placed under `raw/official/financing/cms`
   - `SAMHSA URS` state report pages/PDFs via a network-backed extractor
+- The generated URS financing module currently includes the successful parsed state-year coverage from the last extraction run; rerun `pnpm sources:extract:urs` to refresh or extend that official coverage.
 - Rebuild the generated SAMHSA state metric module with `pnpm sources:extract`.
 - Rebuild official CMS financing data with `pnpm sources:extract:cms`.
 - Rebuild official URS financing data with `pnpm sources:extract:urs` (network access required).
