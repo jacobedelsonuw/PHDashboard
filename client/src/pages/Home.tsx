@@ -147,6 +147,7 @@ export default function Home() {
     return `hsl(${(index * 37) % 360}, 65%, 50%)`;
   };
   const disorderKeys = [
+    "mde_adult",
     "anxiety_disorder",
     "ptsd",
     "substance_use_disorder",
@@ -158,6 +159,7 @@ export default function Home() {
     "adhd",
   ] as const;
   const disorderLabels: Record<(typeof disorderKeys)[number], string> = {
+    mde_adult: "Adult MDE",
     anxiety_disorder: "Anxiety",
     ptsd: "PTSD",
     substance_use_disorder: "Substance Use",
@@ -169,6 +171,7 @@ export default function Home() {
     adhd: "ADHD",
   };
   const disorderColors: Record<(typeof disorderKeys)[number], string> = {
+    mde_adult: "#c026d3",
     anxiety_disorder: "#3b82f6",
     ptsd: "#10b981",
     substance_use_disorder: "#ef4444",
@@ -302,7 +305,7 @@ export default function Home() {
             Explore how mental health indicators have evolved in the United States from 2004 to 2024.
           </p>
           <p className="text-sm text-muted-foreground mt-3">
-            National trend lines are aligned to official U.S. sources listed below. State AMI, SMI, youth MDE, substance use disorder, alcohol use disorder, opioid use disorder, suicide mortality, and resource availability now use official federal source files; country comparisons, burden-resource gap scoring, and the remaining disorder layers are still mixed or modeled.
+            National trend lines are aligned to official U.S. sources listed below. State AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, opioid use disorder, suicide mortality, and resource availability now use official federal source files; country comparisons, burden-resource gap scoring, and the remaining disorder layers are still mixed or modeled.
           </p>
         </div>
 
@@ -676,7 +679,7 @@ export default function Home() {
               </div>
             ))}
             <p className="text-sm text-muted-foreground">
-              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
+              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
             </p>
             <div className="pt-2">
               <h4 className="font-semibold text-foreground mb-3">Metric Provenance Status</h4>

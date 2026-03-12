@@ -11,6 +11,7 @@ import "leaflet/dist/leaflet.css";
 type Metric =
   | "ami"
   | "smi"
+  | "mde_adult"
   | "mde_youth"
   | "suicide_rate"
   | "anxiety_disorder"
@@ -26,6 +27,7 @@ type Metric =
 const METRICS: Metric[] = [
   "ami",
   "smi",
+  "mde_adult",
   "mde_youth",
   "suicide_rate",
   "anxiety_disorder",
@@ -42,6 +44,7 @@ const METRICS: Metric[] = [
 const metricLabels: Record<Metric, string> = {
   ami: "Any Mental Illness (%)",
   smi: "Serious Mental Illness (%)",
+  mde_adult: "Adult Major Depressive Episode (%)",
   mde_youth: "Youth Depression (%)",
   suicide_rate: "Suicide Rate (per 100k)",
   anxiety_disorder: "Anxiety Disorders (%)",

@@ -84,6 +84,14 @@ export const metricProvenance: MetricProvenance[] = [
     sources: ["SAMHSA NSDUH 2023-2024 state-specific tables (HTML)", "SAMHSA NSDUH State Releases (2023-2024)"],
   },
   {
+    metric: "mde_adult",
+    label: "Adult Major Depressive Episode",
+    tier: "official",
+    status: "Integrated from SAMHSA NSDUH 2023-2024 state small-area estimates.",
+    notes: "Uses the official 18+ state prevalence and estimated total from the SAMHSA state-specific tables. This is the direct official adult depression measure available in NSDUH.",
+    sources: ["SAMHSA NSDUH 2023-2024 state-specific tables (HTML)", "SAMHSA NSDUH State Releases (2023-2024)"],
+  },
+  {
     metric: "mde_youth",
     label: "Youth Major Depressive Episode",
     tier: "official",

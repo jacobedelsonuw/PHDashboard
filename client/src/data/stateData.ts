@@ -13,6 +13,8 @@ export interface StateData {
   ami_total?: number;
   smi: number;
   smi_total?: number;
+  mde_adult: number;
+  mde_adult_total?: number;
   mde_youth: number;
   mde_youth_total?: number;
   suicide_rate: number;
@@ -22,6 +24,7 @@ export interface StateData {
   // Core metrics (per capita per 100k)
   ami_per_capita: number;
   smi_per_capita: number;
+  mde_adult_per_capita: number;
   mde_youth_per_capita: number;
   // Additional psychiatric disorders (percentages)
   anxiety_disorder: number;
@@ -55,6 +58,7 @@ export interface ForecastData {
   year: number;
   ami: number;
   smi: number;
+  mde_adult: number;
   mde_youth: number;
   suicide_rate: number;
   anxiety_disorder: number;
@@ -82,6 +86,8 @@ export interface StateResources {
   support_organizations: string[];
 }
 
+type RawStateData = Omit<StateData, "mde_adult" | "mde_adult_total" | "mde_adult_per_capita">;
+
 // Helper function to calculate per capita values
 const calcPerCapita = (percentage: number): number => {
   return Math.round((percentage / 100) * 100000 * 10) / 10;
@@ -91,7 +97,7 @@ const calcPer100kFromTotal = (total: number, population: number): number => {
   return Math.round((total / population) * 100000 * 10) / 10;
 };
 
-const rawStateData: StateData[] = [
+const rawStateData: RawStateData[] = [
   { state: "Alabama", abbreviation: "AL", population: 5108468, ami: 23.5, smi: 6.5, mde_youth: 20.4, suicide_rate: 16.1, treatment_access: 41, ami_per_capita: calcPerCapita(23.5), smi_per_capita: calcPerCapita(6.5), mde_youth_per_capita: calcPerCapita(20.4), anxiety_disorder: 17.9, ptsd: 5.4, substance_use_disorder: 9.1, opioid_use_disorder: 2.7, alcohol_use_disorder: 5.9, bipolar_disorder: 2.8, schizophrenia: 1.0, eating_disorder: 1.6, adhd: 7.1, anxiety_disorder_per_capita: calcPerCapita(17.9), ptsd_per_capita: calcPerCapita(5.4), substance_use_disorder_per_capita: calcPerCapita(9.1), opioid_use_disorder_per_capita: calcPerCapita(2.7), alcohol_use_disorder_per_capita: calcPerCapita(5.9), bipolar_disorder_per_capita: calcPerCapita(2.8), schizophrenia_per_capita: calcPerCapita(1.0), eating_disorder_per_capita: calcPerCapita(1.6), adhd_per_capita: calcPerCapita(7.1), lat: 32.8, lng: -86.8 },
   { state: "Alaska", abbreviation: "AK", population: 733406, ami: 24.8, smi: 7.8, mde_youth: 21.7, suicide_rate: 23.4, treatment_access: 38, ami_per_capita: calcPerCapita(24.8), smi_per_capita: calcPerCapita(7.8), mde_youth_per_capita: calcPerCapita(21.7), anxiety_disorder: 18.9, ptsd: 6.5, substance_use_disorder: 10.2, opioid_use_disorder: 3.2, alcohol_use_disorder: 6.8, bipolar_disorder: 3.2, schizophrenia: 1.2, eating_disorder: 1.8, adhd: 7.7, anxiety_disorder_per_capita: calcPerCapita(18.9), ptsd_per_capita: calcPerCapita(6.5), substance_use_disorder_per_capita: calcPerCapita(10.2), opioid_use_disorder_per_capita: calcPerCapita(3.2), alcohol_use_disorder_per_capita: calcPerCapita(6.8), bipolar_disorder_per_capita: calcPerCapita(3.2), schizophrenia_per_capita: calcPerCapita(1.2), eating_disorder_per_capita: calcPerCapita(1.8), adhd_per_capita: calcPerCapita(7.7), lat: 64.2, lng: -152.5 },
   { state: "Arizona", abbreviation: "AZ", population: 7431344, ami: 23.9, smi: 6.9, mde_youth: 21.0, suicide_rate: 17.8, treatment_access: 40, ami_per_capita: calcPerCapita(23.9), smi_per_capita: calcPerCapita(6.9), mde_youth_per_capita: calcPerCapita(21.0), anxiety_disorder: 18.2, ptsd: 5.7, substance_use_disorder: 9.4, opioid_use_disorder: 2.8, alcohol_use_disorder: 6.1, bipolar_disorder: 2.9, schizophrenia: 1.0, eating_disorder: 1.6, adhd: 7.2, anxiety_disorder_per_capita: calcPerCapita(18.2), ptsd_per_capita: calcPerCapita(5.7), substance_use_disorder_per_capita: calcPerCapita(9.4), opioid_use_disorder_per_capita: calcPerCapita(2.8), alcohol_use_disorder_per_capita: calcPerCapita(6.1), bipolar_disorder_per_capita: calcPerCapita(2.9), schizophrenia_per_capita: calcPerCapita(1.0), eating_disorder_per_capita: calcPerCapita(1.6), adhd_per_capita: calcPerCapita(7.2), lat: 33.7, lng: -111.4 },
@@ -147,9 +153,14 @@ const rawStateData: StateData[] = [
 export const stateData: StateData[] = rawStateData.map((state) => {
   const official = officialNsduhStateMetrics[state.abbreviation];
   const officialSuicide = officialCdcStateSuicideRates[state.abbreviation];
+  const fallbackAdultMde = Math.round(state.mde_youth * 0.7 * 100) / 100;
+  const fallbackAdultMdeTotal = Math.round((fallbackAdultMde / 100) * state.population);
 
   return {
     ...state,
+    mde_adult: official?.mde_adult ?? fallbackAdultMde,
+    mde_adult_total: official?.mde_adult_total ?? fallbackAdultMdeTotal,
+    mde_adult_per_capita: calcPer100kFromTotal(official?.mde_adult_total ?? fallbackAdultMdeTotal, state.population),
     ...(official
       ? {
           official_source_period: official.sourcePeriod,
@@ -159,6 +170,9 @@ export const stateData: StateData[] = rawStateData.map((state) => {
           smi: official.smi,
           smi_total: official.smi_total,
           smi_per_capita: calcPer100kFromTotal(official.smi_total, state.population),
+          mde_adult: official.mde_adult,
+          mde_adult_total: official.mde_adult_total,
+          mde_adult_per_capita: calcPer100kFromTotal(official.mde_adult_total, state.population),
           mde_youth: official.mde_youth,
           mde_youth_total: official.mde_youth_total,
           mde_youth_per_capita: calcPer100kFromTotal(official.mde_youth_total, state.population),
@@ -191,6 +205,7 @@ export const generateForecast = (state: StateData): ForecastData[] => {
     // Forecast with slight increase trend based on historical patterns
     const ami_trend = state.ami + (i * 0.15);
     const smi_trend = state.smi + (i * 0.08);
+    const mde_adult_trend = state.mde_adult + (i * 0.1);
     const mde_trend = state.mde_youth + (i * 0.12);
     const suicide_trend = state.suicide_rate + (i * 0.05);
     const anxiety_trend = state.anxiety_disorder + (i * 0.12);
@@ -207,6 +222,7 @@ export const generateForecast = (state: StateData): ForecastData[] => {
       year,
       ami: Math.round(ami_trend * 10) / 10,
       smi: Math.round(smi_trend * 10) / 10,
+      mde_adult: Math.round(mde_adult_trend * 10) / 10,
       mde_youth: Math.round(mde_trend * 10) / 10,
       suicide_rate: Math.round(suicide_trend * 10) / 10,
       anxiety_disorder: Math.round(anxiety_trend * 10) / 10,

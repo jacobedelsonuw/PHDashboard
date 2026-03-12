@@ -16,6 +16,7 @@ interface ChoroplethMapProps {
 const MENTAL_METRICS = [
   "ami",
   "smi",
+  "mde_adult",
   "mde_youth",
   "suicide_rate",
   "anxiety_disorder",
@@ -45,6 +46,7 @@ type MetricGroup = "conditions" | "resources" | "gap";
 type TotalMetricKey =
   | "ami_total"
   | "smi_total"
+  | "mde_adult_total"
   | "mde_youth_total"
   | "substance_use_disorder_total"
   | "opioid_use_disorder_total"
@@ -61,6 +63,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const metricLabels: Record<Metric, string> = {
     ami: "Any Mental Illness (%)",
     smi: "Serious Mental Illness (%)",
+    mde_adult: "Adult Major Depressive Episode (%)",
     mde_youth: "Youth Depression (%)",
     suicide_rate: "Suicide Rate (per 100k)",
     anxiety_disorder: "Anxiety Disorders (%)",
@@ -82,6 +85,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const metricColors: Record<Metric, string> = {
     ami: "#8b5cf6",
     smi: "#f97316",
+    mde_adult: "#c026d3",
     mde_youth: "#ec4899",
     suicide_rate: "#a855f7",
     anxiety_disorder: "#3b82f6",
@@ -146,6 +150,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const burdenMetricsForGap: readonly MentalMetric[] = [
     "ami",
     "smi",
+    "mde_adult",
     "mde_youth",
     "suicide_rate",
     "anxiety_disorder",
@@ -246,6 +251,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     metricKey:
       | "ami"
       | "smi"
+      | "mde_adult"
       | "mde_youth"
       | "anxiety_disorder"
       | "ptsd"
@@ -514,6 +520,12 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                     <p className="text-xs text-muted-foreground mt-2">{selectedState.smi_per_capita.toLocaleString()} per 100k</p>
                     <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "smi")}</p>
                   </div>
+                  <div className="p-4 bg-fuchsia-50 rounded-lg">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Adult Major Depressive Episode</p>
+                    <p className="text-2xl font-bold text-foreground">{selectedState.mde_adult}%</p>
+                    <p className="text-xs text-muted-foreground mt-2">{selectedState.mde_adult_per_capita.toLocaleString()} per 100k</p>
+                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "mde_adult")}</p>
+                  </div>
                   <div className="p-4 bg-pink-50 rounded-lg">
                     <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Youth Depression</p>
                     <p className="text-2xl font-bold text-foreground">{selectedState.mde_youth}%</p>
@@ -537,6 +549,12 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
               <div className="my-6">
                 <h3 className="font-semibold text-lg mb-4">Psychiatric Disorders Prevalence</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="p-3 bg-fuchsia-50 rounded-lg">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Adult Major Depressive Episode</p>
+                    <p className="text-lg font-bold text-foreground">{selectedState.mde_adult}%</p>
+                    <p className="text-xs text-muted-foreground mt-1">{selectedState.mde_adult_per_capita.toLocaleString()} per 100k</p>
+                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "mde_adult")}</p>
+                  </div>
                   <div className="p-3 bg-blue-50 rounded-lg">
                     <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Anxiety</p>
                     <p className="text-lg font-bold text-foreground">{selectedState.anxiety_disorder}%</p>
@@ -684,6 +702,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                     <Legend />
                     <Line type="monotone" dataKey="ami" stroke="#8b5cf6" strokeWidth={2} name="AMI %" dot={false} />
                     <Line type="monotone" dataKey="smi" stroke="#f97316" strokeWidth={2} name="SMI %" dot={false} />
+                    <Line type="monotone" dataKey="mde_adult" stroke="#c026d3" strokeWidth={2} name="Adult MDE %" dot={false} />
                     <Line type="monotone" dataKey="mde_youth" stroke="#ec4899" strokeWidth={2} name="Youth MDE %" dot={false} />
                     <Line type="monotone" dataKey="suicide_rate" stroke="#a855f7" strokeWidth={2} name="Suicide Rate" dot={false} />
                     <Line type="monotone" dataKey="anxiety_disorder" stroke="#3b82f6" strokeWidth={1.5} name="Anxiety" dot={false} />
@@ -707,6 +726,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                     data={[
                       { metric: "AMI", state: selectedState.ami, national: 23.4 },
                       { metric: "SMI", state: selectedState.smi, national: 5.6 },
+                      { metric: "Adult MDE", state: selectedState.mde_adult, national: 12.5 },
                       { metric: "Youth MDE", state: selectedState.mde_youth, national: 20.2 },
                       { metric: "Suicide", state: selectedState.suicide_rate, national: 14.5 },
                       { metric: "Anxiety", state: selectedState.anxiety_disorder, national: 17.8 },

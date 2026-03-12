@@ -11,6 +11,7 @@ const columns = ["year", "12+", "12-17", "18-25", "26+", "18+"];
 const measureConfigs = [
   { label: "Any Mental Illness", key: "ami", column: "18+" },
   { label: "Serious Mental Illness", key: "smi", column: "18+" },
+  { label: "Major Depressive Episode", key: "mde_adult", column: "18+" },
   { label: "Major Depressive Episode", key: "mde_youth", column: "12-17" },
   { label: "Substance Use Disorder", key: "substance_use_disorder", column: "12+" },
   { label: "Alcohol Use Disorder", key: "alcohol_use_disorder", column: "12+", exclude: "People Aged 12 to 20" },
@@ -163,9 +164,23 @@ if (abbreviations.length !== 50) {
   throw new Error(`Expected 50 state entries, found ${abbreviations.length}`);
 }
 
+const requiredMeasureKeys = [
+  "ami",
+  "smi",
+  "mde_adult",
+  "mde_youth",
+  "substance_use_disorder",
+  "alcohol_use_disorder",
+  "opioid_use_disorder",
+];
+
 for (const abbreviation of abbreviations) {
   const entry = officialMetrics[abbreviation];
-  for (const config of measureConfigs.slice(0, 6)) {
+  for (const key of requiredMeasureKeys) {
+    const config = measureConfigs.find((item) => item.key === key);
+    if (!config) {
+      throw new Error(`Missing config for required metric ${key}`);
+    }
     if (typeof entry[config.key] !== "number") {
       throw new Error(`Missing percentage for ${config.key} in ${abbreviation}`);
     }
@@ -175,7 +190,7 @@ for (const abbreviation of abbreviations) {
   }
 }
 
-const typeDef = `export interface OfficialNsduhStateMetric {\n  state: string;\n  sourcePeriod: string;\n  ami: number;\n  ami_total: number;\n  smi: number;\n  smi_total: number;\n  mde_youth: number;\n  mde_youth_total: number;\n  substance_use_disorder: number;\n  substance_use_disorder_total: number;\n  alcohol_use_disorder: number;\n  alcohol_use_disorder_total: number;\n  opioid_use_disorder: number;\n  opioid_use_disorder_total: number;\n  received_mental_health_treatment?: number;\n  received_mental_health_treatment_total?: number;\n  serious_thoughts_of_suicide?: number;\n  serious_thoughts_of_suicide_total?: number;\n  suicide_plans?: number;\n  suicide_plans_total?: number;\n  suicide_attempt?: number;\n  suicide_attempt_total?: number;\n}\n\n`;
+const typeDef = `export interface OfficialNsduhStateMetric {\n  state: string;\n  sourcePeriod: string;\n  ami: number;\n  ami_total: number;\n  smi: number;\n  smi_total: number;\n  mde_adult: number;\n  mde_adult_total: number;\n  mde_youth: number;\n  mde_youth_total: number;\n  substance_use_disorder: number;\n  substance_use_disorder_total: number;\n  alcohol_use_disorder: number;\n  alcohol_use_disorder_total: number;\n  opioid_use_disorder: number;\n  opioid_use_disorder_total: number;\n  received_mental_health_treatment?: number;\n  received_mental_health_treatment_total?: number;\n  serious_thoughts_of_suicide?: number;\n  serious_thoughts_of_suicide_total?: number;\n  suicide_plans?: number;\n  suicide_plans_total?: number;\n  suicide_attempt?: number;\n  suicide_attempt_total?: number;\n}\n\n`;
 
 const serialized = abbreviations
   .map((abbreviation) => `  ${abbreviation}: ${JSON.stringify(officialMetrics[abbreviation], null, 2).replace(/\n/g, "\n  ")},`)
