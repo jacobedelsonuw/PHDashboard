@@ -1,4 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   LineChart,
@@ -99,6 +109,12 @@ export default function Home() {
   const [selectedFinancingAnalysisYear, setSelectedFinancingAnalysisYear] = useState<FinancingYear>(
     FINANCING_YEARS[FINANCING_YEARS.length - 1]
   );
+  const [selectedExportTables, setSelectedExportTables] = useState({
+    gapScores: true,
+    persistence: true,
+    typology: true,
+    regression: true,
+  });
   const [selectedExpansionState, setSelectedExpansionState] = useState(
     expansionTransitionStates[expansionTransitionStates.length - 1]?.abbreviation ?? "NC"
   );
@@ -123,14 +139,13 @@ export default function Home() {
   const latestFinancingStates = [...latestFinancingAllStates]
     .sort((a, b) => b.public_mh_spending_per_capita - a.public_mh_spending_per_capita)
     .slice(0, 12);
-  const latestNeedFundingRegression = getNeedFundingRegression(latestFinancingYear);
   const selectedNeedFundingRegression = getNeedFundingRegression(selectedFinancingAnalysisYear);
   const selectedNeedFundingScatter = getNeedFundingScatterSummary(selectedFinancingAnalysisYear);
   const persistentUnderinvestmentThreshold = getPersistentUnderfundingThreshold();
   const persistentUnderinvestmentStates = getPersistentUnderinvestmentStates().slice(0, 10);
   const selectedTypologySummary = getTypologySummaryByYear(selectedFinancingAnalysisYear);
   const expansionMismatchTrend = getExpansionMismatchTrend();
-  const expansionMismatchDistribution = getExpansionMismatchDistribution(latestFinancingYear);
+  const expansionMismatchDistribution = getExpansionMismatchDistribution(selectedFinancingAnalysisYear);
   const expansionEventTrend = getExpansionEventTrend();
   const medicaidExpansionPolicyRegression = getMedicaidExpansionPolicyRegression();
   const selectedExpansionStateTrend = getStateExpansionTrend(selectedExpansionState);
@@ -174,6 +189,12 @@ export default function Home() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+  const toggleExportTable = (key: keyof typeof selectedExportTables, checked: boolean | "indeterminate") => {
+    setSelectedExportTables((current) => ({
+      ...current,
+      [key]: checked === true,
+    }));
+  };
   const downloadFinancingAnalyticsZip = async () => {
     const [{ default: JSZip }] = await Promise.all([import("jszip")]);
     const zip = new JSZip();
@@ -191,10 +212,31 @@ export default function Home() {
         sample_size: selectedNeedFundingRegression.sampleSize,
       },
     ];
-    zip.file(`gap-scores-${selectedFinancingAnalysisYear}.csv`, rowsToCsv(gapRows));
-    zip.file("persistent-underinvestment.csv", rowsToCsv(persistenceRows));
-    zip.file(`typology-${selectedFinancingAnalysisYear}.csv`, rowsToCsv(typologyRows));
-    zip.file(`need-funding-regression-${selectedFinancingAnalysisYear}.csv`, rowsToCsv(regressionSummary));
+    const includedFiles: string[] = [];
+
+    if (selectedExportTables.gapScores) {
+      const filename = `gap-scores-${selectedFinancingAnalysisYear}.csv`;
+      zip.file(filename, rowsToCsv(gapRows));
+      includedFiles.push(`- ${filename}`);
+    }
+    if (selectedExportTables.persistence) {
+      const filename = "persistent-underinvestment.csv";
+      zip.file(filename, rowsToCsv(persistenceRows));
+      includedFiles.push(`- ${filename}`);
+    }
+    if (selectedExportTables.typology) {
+      const filename = `typology-${selectedFinancingAnalysisYear}.csv`;
+      zip.file(filename, rowsToCsv(typologyRows));
+      includedFiles.push(`- ${filename}`);
+    }
+    if (selectedExportTables.regression) {
+      const filename = `need-funding-regression-${selectedFinancingAnalysisYear}.csv`;
+      zip.file(filename, rowsToCsv(regressionSummary));
+      includedFiles.push(`- ${filename}`);
+    }
+
+    if (!includedFiles.length) return;
+
     zip.file(
       "README.txt",
       [
@@ -202,10 +244,7 @@ export default function Home() {
         `Analysis year: ${selectedFinancingAnalysisYear}`,
         "",
         "Included files:",
-        `- gap-scores-${selectedFinancingAnalysisYear}.csv`,
-        "- persistent-underinvestment.csv",
-        `- typology-${selectedFinancingAnalysisYear}.csv`,
-        `- need-funding-regression-${selectedFinancingAnalysisYear}.csv`,
+        ...includedFiles,
       ].join("\n")
     );
     const blob = await zip.generateAsync({ type: "blob" });
@@ -753,12 +792,84 @@ export default function Home() {
                         ))}
                       </select>
                     </div>
-                    <button
-                      onClick={downloadFinancingAnalyticsZip}
-                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 transition-colors hover:bg-slate-50"
-                    >
-                      Download financing ZIP
-                    </button>
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <button className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 transition-colors hover:bg-slate-50">
+                          Export options
+                        </button>
+                      </SheetTrigger>
+                      <SheetContent side="right" className="w-full sm:max-w-md">
+                        <SheetHeader>
+                          <SheetTitle>Financing export package</SheetTitle>
+                          <SheetDescription>
+                            Choose which financing tables to include in the ZIP for {selectedFinancingAnalysisYear}.
+                          </SheetDescription>
+                        </SheetHeader>
+                        <div className="flex-1 space-y-4 overflow-y-auto px-4">
+                          <label className="flex items-start gap-3 rounded-lg border p-3">
+                            <Checkbox
+                              checked={selectedExportTables.gapScores}
+                              onCheckedChange={(checked) => toggleExportTable("gapScores", checked)}
+                            />
+                            <div>
+                              <p className="text-sm font-medium text-foreground">Gap scores</p>
+                              <p className="text-xs text-muted-foreground">
+                                State-level need, actual funding, predicted funding, and mismatch values for {selectedFinancingAnalysisYear}.
+                              </p>
+                            </div>
+                          </label>
+                          <label className="flex items-start gap-3 rounded-lg border p-3">
+                            <Checkbox
+                              checked={selectedExportTables.persistence}
+                              onCheckedChange={(checked) => toggleExportTable("persistence", checked)}
+                            />
+                            <div>
+                              <p className="text-sm font-medium text-foreground">Persistence flags</p>
+                              <p className="text-xs text-muted-foreground">
+                                Cross-year persistent underinvestment summary and thresholds.
+                              </p>
+                            </div>
+                          </label>
+                          <label className="flex items-start gap-3 rounded-lg border p-3">
+                            <Checkbox
+                              checked={selectedExportTables.typology}
+                              onCheckedChange={(checked) => toggleExportTable("typology", checked)}
+                            />
+                            <div>
+                              <p className="text-sm font-medium text-foreground">Typology assignments</p>
+                              <p className="text-xs text-muted-foreground">
+                                Cluster assignments and financing characteristics for {selectedFinancingAnalysisYear}.
+                              </p>
+                            </div>
+                          </label>
+                          <label className="flex items-start gap-3 rounded-lg border p-3">
+                            <Checkbox
+                              checked={selectedExportTables.regression}
+                              onCheckedChange={(checked) => toggleExportTable("regression", checked)}
+                            />
+                            <div>
+                              <p className="text-sm font-medium text-foreground">Regression summary</p>
+                              <p className="text-xs text-muted-foreground">
+                                Need-funding slope, intercept, fit, and residual standard deviation for {selectedFinancingAnalysisYear}.
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                        <SheetFooter>
+                          <p className="text-xs text-muted-foreground">
+                            {Object.values(selectedExportTables).filter(Boolean).length} table
+                            {Object.values(selectedExportTables).filter(Boolean).length === 1 ? "" : "s"} selected
+                          </p>
+                          <button
+                            onClick={downloadFinancingAnalyticsZip}
+                            disabled={!Object.values(selectedExportTables).some(Boolean)}
+                            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Download ZIP
+                          </button>
+                        </SheetFooter>
+                      </SheetContent>
+                    </Sheet>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -987,12 +1098,19 @@ export default function Home() {
 
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <div className="rounded-lg border p-4">
-                      <h3 className="text-sm font-semibold text-foreground mb-1">
-                        {latestFinancingYear} mismatch distribution by expansion status
-                      </h3>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Each point is a state. Higher mismatch index values indicate more funding than predicted given need; lower values indicate greater underfunding.
-                      </p>
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-foreground">
+                            {selectedFinancingAnalysisYear} mismatch distribution by expansion status
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            Each point is a state. Higher mismatch index values indicate more funding than predicted given need; lower values indicate greater underfunding.
+                          </p>
+                        </div>
+                        <div className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                          Year: {selectedFinancingAnalysisYear}
+                        </div>
+                      </div>
                       <ResponsiveContainer width="100%" height={300}>
                         <ScatterChart margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
