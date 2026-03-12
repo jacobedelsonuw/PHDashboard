@@ -154,11 +154,11 @@ export const stateFinancingData: StateFinancingRecord[] = FINANCING_YEARS.flatMa
     const officialLocalOtherMillions = (officialUrs?.local_funds_millions ?? 0) + (officialUrs?.other_millions ?? 0);
     const medicaidShare =
       officialUrs && officialFundingTotalMillions > 0
-        ? round((officialUrs.medicaid_millions / officialFundingTotalMillions) * 100, 1)
+        ? round((((officialUrs.medicaid_millions ?? 0) / officialFundingTotalMillions) * 100), 1)
         : modeledMedicaidShare;
     const stateShare =
       officialUrs && officialFundingTotalMillions > 0
-        ? round((officialUrs.state_funds_millions / officialFundingTotalMillions) * 100, 1)
+        ? round((((officialUrs.state_funds_millions ?? 0) / officialFundingTotalMillions) * 100), 1)
         : modeledStateShare;
     const otherFederalShare =
       officialUrs && officialFundingTotalMillions > 0
@@ -220,6 +220,7 @@ export const getFinancingMetricValue = (record: StateFinancingRecord, metric: Fi
 
 export const getFinancingProvenanceSummary = (record: StateFinancingRecord): FinancingProvenanceSummary => {
   const hasUrs = typeof record.official_urs_total_smha_expenditures_millions === "number";
+  const hasUrsFundingShares = typeof record.official_urs_funding_total_millions === "number" && record.official_urs_funding_total_millions > 0;
   const hasCms = typeof record.official_cms_total_net_expenditures_millions === "number";
   const hasMhbg =
     typeof record.official_mhbg_formula_millions === "number" || typeof record.official_mhbg_supplemental_millions === "number";
@@ -229,7 +230,9 @@ export const getFinancingProvenanceSummary = (record: StateFinancingRecord): Fin
       level: "mixed_official",
       label: "Official URS + CMS/MHBG",
       badges: ["URS", ...(hasCms ? ["CMS"] : []), ...(hasMhbg ? ["MHBG"] : [])],
-      note: "Public mental health spending and funding-source shares are direct URS values; Medicaid expenditure and federal grant components also use official CMS and/or MHBG files where available.",
+      note: hasUrsFundingShares
+        ? "Public mental health spending and funding-source shares are direct URS values; Medicaid expenditure and federal grant components also use official CMS and/or MHBG files where available."
+        : "Public mental health spending totals are direct URS values; Medicaid expenditure and grant components also use official CMS and/or MHBG files where available, while funding-source shares still rely on the harmonized financing model.",
     };
   }
 
@@ -238,7 +241,9 @@ export const getFinancingProvenanceSummary = (record: StateFinancingRecord): Fin
       level: "official_urs",
       label: "Official URS-backed",
       badges: ["URS"],
-      note: "This state-year uses direct SAMHSA URS public mental health spending and funding-share values. Components not covered by URS may still use the dashboard's financing model.",
+      note: hasUrsFundingShares
+        ? "This state-year uses direct SAMHSA URS public mental health spending and funding-share values. Components not covered by URS may still use the dashboard's financing model."
+        : "This state-year uses a direct SAMHSA URS public mental health spending total, while funding-source shares still rely on the harmonized financing model because the URS funding table was not machine-readable in the source PDF.",
     };
   }
 

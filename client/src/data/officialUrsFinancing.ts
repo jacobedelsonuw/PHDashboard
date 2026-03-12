@@ -5,18 +5,18 @@ export interface OfficialUrsFinancingRecord {
   state: string;
   sourceYear: number;
   community_mh_expenditures_millions: number;
-  state_expenditures_from_state_sources_millions: number;
+  state_expenditures_from_state_sources_millions?: number;
   total_smha_expenditures_millions: number;
-  mhbg_millions: number;
+  mhbg_millions?: number;
   covid_relief_mhbg_millions?: number;
   arp_mhbg_millions?: number;
   bsca_mhbg_millions?: number;
-  medicaid_millions: number;
-  other_federal_millions: number;
-  state_funds_millions: number;
-  local_funds_millions: number;
-  other_millions: number;
-  funding_total_millions: number;
+  medicaid_millions?: number;
+  other_federal_millions?: number;
+  state_funds_millions?: number;
+  local_funds_millions?: number;
+  other_millions?: number;
+  funding_total_millions?: number;
   admin_gap_millions?: number;
 }
 
@@ -412,6 +412,13 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
       "funding_total_millions": 283.92,
       "admin_gap_millions": 1.49
     },
+    "2022": {
+      "state": "Colorado",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 155.35,
+      "total_smha_expenditures_millions": 339.35,
+      "admin_gap_millions": 339.35
+    },
     "2023": {
       "state": "Colorado",
       "sourceYear": 2023,
@@ -467,6 +474,13 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
       "other_millions": 0.0,
       "funding_total_millions": 922.99,
       "admin_gap_millions": 48.44
+    },
+    "2022": {
+      "state": "Connecticut",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 649.78,
+      "total_smha_expenditures_millions": 1041.39,
+      "admin_gap_millions": 1041.39
     },
     "2023": {
       "state": "Connecticut",
@@ -1524,6 +1538,23 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
     }
   },
   MI: {
+    "2022": {
+      "state": "Michigan",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 2.89,
+      "total_smha_expenditures_millions": 4.45,
+      "mhbg_millions": 3.18,
+      "covid_relief_mhbg_millions": 0.4,
+      "arp_mhbg_millions": 0.0,
+      "bsca_mhbg_millions": 0.0,
+      "medicaid_millions": 0.0,
+      "other_federal_millions": 0.0,
+      "state_funds_millions": 0.0,
+      "local_funds_millions": 0.0,
+      "other_millions": 0.0,
+      "funding_total_millions": 3.57,
+      "admin_gap_millions": 0.88
+    },
     "2023": {
       "state": "Michigan",
       "sourceYear": 2023,
@@ -2080,6 +2111,13 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
       "funding_total_millions": 314.86,
       "admin_gap_millions": 0.1
     },
+    "2022": {
+      "state": "New Hampshire",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 318.67,
+      "total_smha_expenditures_millions": 407.32,
+      "admin_gap_millions": 407.32
+    },
     "2023": {
       "state": "New Hampshire",
       "sourceYear": 2023,
@@ -2283,6 +2321,23 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
       "other_millions": 0.0,
       "funding_total_millions": 95.32,
       "admin_gap_millions": 18.43
+    },
+    "2022": {
+      "state": "Nevada",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 45.44,
+      "total_smha_expenditures_millions": 132.75,
+      "mhbg_millions": 6.21,
+      "covid_relief_mhbg_millions": 1.16,
+      "arp_mhbg_millions": 0.35,
+      "bsca_mhbg_millions": 0.0,
+      "medicaid_millions": 3.05,
+      "other_federal_millions": 0.29,
+      "state_funds_millions": 34.11,
+      "local_funds_millions": 0.0,
+      "other_millions": 0.0,
+      "funding_total_millions": 46.57,
+      "admin_gap_millions": 86.18
     },
     "2023": {
       "state": "Nevada",
@@ -2525,6 +2580,23 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
       "other_millions": 0.0,
       "funding_total_millions": 1503.06,
       "admin_gap_millions": 0.01
+    },
+    "2022": {
+      "state": "Oregon",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 1221.94,
+      "total_smha_expenditures_millions": 1611.4,
+      "mhbg_millions": 28.49,
+      "covid_relief_mhbg_millions": 0.0,
+      "arp_mhbg_millions": 0.0,
+      "bsca_mhbg_millions": 0.0,
+      "medicaid_millions": 964.29,
+      "other_federal_millions": 3.07,
+      "state_funds_millions": 255.45,
+      "local_funds_millions": 0.0,
+      "other_millions": 0.0,
+      "funding_total_millions": 1251.3,
+      "admin_gap_millions": 360.1
     },
     "2023": {
       "state": "Oregon",

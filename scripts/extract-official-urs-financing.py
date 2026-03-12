@@ -78,6 +78,8 @@ RELEVANT_STREAM_KEYWORDS = (
     b'Medicaid (Federal, State, and Local)',
     b'Activity Expenditures',
     b'State Mental Health Agency Controlled Expenditures for',
+    b'State Revenue Expenditure Data',
+    b'Total SMHA Mental Health Expenditure',
 )
 
 
@@ -123,30 +125,75 @@ def extract_summary_fields(chunks: list[str]) -> dict[str, float]:
     raise ValueError('Could not locate summary finance table in URS PDF')
 
 
+def extract_summary_fields_from_state_summary(chunks: list[str], year: int) -> dict[str, float]:
+    total_label = rf'FY {year} Total SMHA Mental Health Expenditure'
+    community_label = rf'FY {year} SMHA Community MH Expenditures'
+    community_percent_label = rf'FY {year} Community Percent of Total SMHA Spending'
+
+    for text in chunks:
+        if f'FY {year} Total SMHA Mental Health Expenditure' not in text:
+            continue
+
+        total_match = re.search(rf'{total_label}\s+\$([0-9,]+)', text)
+        if not total_match:
+            continue
+
+        community_match = re.search(rf'{community_label}\s+\$([0-9,]+)', text)
+        community_percent_match = re.search(rf'{community_percent_label}\s+([0-9.]+)%', text)
+
+        total_smha = money_to_millions(total_match.group(1))
+        community_mh = money_to_millions(community_match.group(1)) if community_match else 0.0
+        if community_mh == 0 and community_percent_match:
+            community_mh = round(total_smha * (float(community_percent_match.group(1)) / 100), 2)
+
+        if total_smha > 0 and community_mh > 0:
+            return {
+                'community_mh_expenditures_millions': community_mh,
+                'total_smha_expenditures_millions': total_smha,
+            }
+
+    raise ValueError('Could not locate state summary finance values in URS PDF')
+
+
 def extract_summary_fields_from_activity_table(chunks: list[str], funding_values: dict[str, float]) -> dict[str, float]:
-    component_labels = [
-        'Mental Health Prevention',
-        'EBPs for Early Serious Mental Illness Including First Episode Psychosis',
-        'Other 24-Hour Care',
-        'Ambulatory/Community',
-        'Crisis Services',
-    ]
+    component_patterns = {
+        'prevention': [
+            r'Mental Health Prevention\s+(\$[0-9,]+|-)',
+            r'Primary Prevention\s+(\$[0-9,]+|-)',
+        ],
+        'esmi': [
+            r'EBPs for Early Serious Mental Illness Including First Episode Psychosis\s+(\$[0-9,]+|-)',
+            r'EBPs for Early Serious Mental Illness\s+(\$[0-9,]+|-)',
+        ],
+        'other_24_hour': [r'Other 24-Hour Care\s+(\$[0-9,]+|-)'],
+        'ambulatory': [r'Ambulatory/Community\s+(\$[0-9,]+|-)'],
+        'crisis': [r'Crisis Services\s+(\$[0-9,]+|-)'],
+        'total': [r'Total\s+(\$[0-9,]+)\s+100%'],
+    }
+
+    def first_amount(text: str, patterns: list[str]) -> float:
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                return money_to_millions(match.group(1))
+        return 0.0
+
     for text in chunks:
         if 'Activity Expenditures:' not in text or 'State Mental Health Agency Controlled Expenditures for Mental Health' not in text:
             continue
 
-        total_match = re.search(r'Total\s+\$([0-9,]+)\s+100%', text)
-        if not total_match:
+        total_smha = first_amount(text, component_patterns['total'])
+        if total_smha <= 0:
             continue
 
-        community_total = 0.0
-        for label in component_labels:
-            match = re.search(rf'{re.escape(label)}\s+(\$[0-9,]+|-)\s+[0-9]+%|\b{re.escape(label)}\s+(\$[0-9,]+|-)', text)
-            if not match:
-                continue
-            value = next((group for group in match.groups() if group is not None), None)
-            community_total += money_to_millions(value)
-
+        community_total = round(
+            first_amount(text, component_patterns['prevention']) +
+            first_amount(text, component_patterns['esmi']) +
+            first_amount(text, component_patterns['other_24_hour']) +
+            first_amount(text, component_patterns['ambulatory']) +
+            first_amount(text, component_patterns['crisis']),
+            2
+        )
         if community_total <= 0:
             continue
 
@@ -154,7 +201,7 @@ def extract_summary_fields_from_activity_table(chunks: list[str], funding_values
         return {
             'community_mh_expenditures_millions': round(community_total, 2),
             'state_expenditures_from_state_sources_millions': state_sources,
-            'total_smha_expenditures_millions': money_to_millions(total_match.group(1)),
+            'total_smha_expenditures_millions': total_smha,
         }
 
     raise ValueError('Could not locate fallback activity finance table in URS PDF')
@@ -267,12 +314,18 @@ def extract_state_year(state_name: str, abbreviation: str, year: int) -> tuple[s
     pdf_url = extract_pdf_url(report_html)
     pdf_bytes = fetch_bytes(pdf_url)
     chunks = extract_pdf_text_chunks(pdf_bytes)
-    funding_values = extract_funding_fields(chunks)
+    try:
+        funding_values = extract_funding_fields(chunks)
+    except ValueError:
+        funding_values = {}
     try:
         summary_values = extract_summary_fields(chunks)
     except ValueError:
-        summary_values = extract_summary_fields_from_activity_table(chunks, funding_values)
-    state_total = funding_values.get('funding_total_millions', 0.0)
+        try:
+            summary_values = extract_summary_fields_from_activity_table(chunks, funding_values)
+        except ValueError:
+            summary_values = extract_summary_fields_from_state_summary(chunks, year)
+    state_total = funding_values.get('funding_total_millions', 0.0) if funding_values else 0.0
     total_smha = summary_values['total_smha_expenditures_millions']
     return (
         abbreviation,
@@ -291,18 +344,18 @@ type_definition = '''export interface OfficialUrsFinancingRecord {
   state: string;
   sourceYear: number;
   community_mh_expenditures_millions: number;
-  state_expenditures_from_state_sources_millions: number;
+  state_expenditures_from_state_sources_millions?: number;
   total_smha_expenditures_millions: number;
-  mhbg_millions: number;
+  mhbg_millions?: number;
   covid_relief_mhbg_millions?: number;
   arp_mhbg_millions?: number;
   bsca_mhbg_millions?: number;
-  medicaid_millions: number;
-  other_federal_millions: number;
-  state_funds_millions: number;
-  local_funds_millions: number;
-  other_millions: number;
-  funding_total_millions: number;
+  medicaid_millions?: number;
+  other_federal_millions?: number;
+  state_funds_millions?: number;
+  local_funds_millions?: number;
+  other_millions?: number;
+  funding_total_millions?: number;
   admin_gap_millions?: number;
 }
 
