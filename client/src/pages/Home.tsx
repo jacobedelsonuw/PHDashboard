@@ -720,9 +720,12 @@ export default function Home() {
                       <Tooltip
                         contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
                         formatter={(value: number, name: string) => {
-                          if (name === "medicaid_total_expenditures_billions") return [`$${value}B`, "Medicaid Expenditures"];
-                          if (name === "medicaid_share_of_public_mh") return [`${value}%`, "Avg Medicaid Share of Public MH"];
-                          return [`$${Number(value).toLocaleString()}M`, name === "mhbg_allotment_millions" ? "MHBG Allotment" : name === "federal_mental_health_funding_millions" ? "Federal Mental Health Funding" : "Public MH Spending"];
+                          if (name === "Medicaid Expenditures (B)") return [`$${value}B`, "Medicaid Expenditures"];
+                          if (name === "Avg Medicaid Share of Public MH") return [`${value}%`, "Avg Medicaid Share of Public MH"];
+                          if (name === "MHBG Allotment") return [`$${Number(value).toLocaleString()}M`, "MHBG Allotment"];
+                          if (name === "Federal Mental Health Funding") return [`$${Number(value).toLocaleString()}M`, "Federal Mental Health Funding"];
+                          if (name === "Public MH Spending") return [`$${Number(value).toLocaleString()}M`, "Public MH Spending"];
+                          return [`$${Number(value).toLocaleString()}M`, name];
                         }}
                       />
                       <Legend />
@@ -929,8 +932,11 @@ export default function Home() {
                       <Tooltip
                         contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
                         formatter={(value: number, name: string) => {
-                          if (name === "average_gap_per_capita") return [`$${value}`, "Average Gap per Capita"];
-                          return [`$${value}`, `${selectedFinancingAnalysisYear} Gap per Capita`];
+                          if (name === "Average Gap per Capita") return [`$${value}`, "Average Gap per Capita"];
+                          if (name === `${selectedFinancingAnalysisYear} Gap per Capita`) {
+                            return [`$${value}`, `${selectedFinancingAnalysisYear} Gap per Capita`];
+                          }
+                          return [`$${value}`, name];
                         }}
                       />
                       <Legend />
