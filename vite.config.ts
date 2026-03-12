@@ -184,12 +184,6 @@ export default defineConfig({
           if (id.includes("/recharts/") || id.includes("d3-")) {
             return "charts-vendor";
           }
-          if (id.includes("@radix-ui") || id.includes("class-variance-authority") || id.includes("clsx") || id.includes("tailwind-merge")) {
-            return "ui-vendor";
-          }
-          if (id.includes("/react/") || id.includes("react-dom") || id.includes("wouter")) {
-            return "react-vendor";
-          }
         },
       },
     },
