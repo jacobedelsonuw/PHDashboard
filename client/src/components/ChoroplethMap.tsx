@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
-import { stateData, generateForecast, getStateResources, StateData } from "@/data/stateData";
+import { stateData, getStateResources, StateData } from "@/data/stateData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
-import { Phone, MessageCircle, TrendingUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { feature } from "topojson-client";
 import usAtlas from "us-atlas/states-10m.json";
 import {
@@ -97,6 +96,7 @@ const MENTAL_TREND_BASELINES: Record<keyof (typeof nationalTrendData)[number], n
   mde_youth: 20.2,
   suicide: 14.5,
 };
+const FINANCING_DISPLAY_YEARS = FINANCING_YEARS.filter((year) => year >= 2020);
 
 export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const [hoveredState, setHoveredState] = useState<StateData | null>(null);
@@ -206,7 +206,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
   const centeredYearProgress = yearProgress * 2 - 1;
   const activeYearOptions: number[] =
     metricGroup === "financing" || metricGroup === "needFunding" || metricGroup === "typology"
-      ? [...FINANCING_YEARS]
+      ? [...FINANCING_DISPLAY_YEARS]
       : nationalTrendData.map((point) => point.year);
   const selectedTrendPoint = trendByYear.get(selectedYear) ?? nationalTrendData[nationalTrendData.length - 1];
   const selectedFinancingRows = useMemo(
@@ -407,6 +407,31 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     return { min: Math.min(...values), max: Math.max(...values) };
   }, [burdenGapByAbbreviation]);
   const getGapValue = (state: StateData) => burdenGapByAbbreviation.get(state.abbreviation) ?? 0;
+  const burdenCompositeByAbbreviation = useMemo(() => {
+    return new Map(
+      stateData.map((state) => {
+        const burdenScore =
+          burdenMetricsForGap.reduce((sum, metricKey) => {
+            const range = mentalRangeByMetric[metricKey];
+            return sum + normalize(getMetricValue(state, metricKey), range.min, range.max);
+          }, 0) / burdenMetricsForGap.length;
+        return [state.abbreviation, Math.round(burdenScore * 100) / 100] as const;
+      })
+    );
+  }, [mentalRangeByMetric, selectedYear]);
+  const resourceCompositeByAbbreviation = useMemo(() => {
+    return new Map(
+      stateData.map((state) => {
+        const resourceScore =
+          RESOURCE_METRICS.reduce((sum, metricKey) => {
+            const value = getMetricValue(state, metricKey);
+            const range = resourceRangeByMetric[metricKey];
+            return sum + normalize(value, range.min, range.max);
+          }, 0) / RESOURCE_METRICS.length;
+        return [state.abbreviation, Math.round(resourceScore * 100) / 100] as const;
+      })
+    );
+  }, [resourceRangeByMetric, selectedYear]);
   const getDisplayValue = (state: StateData, metricKey: Metric) => {
     if (metricKey === GAP_METRIC) return getGapValue(state);
     if (metricKey === NEED_FUNDING_GAP_METRIC) {
@@ -498,6 +523,7 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     }
     return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
+  const formatCount = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 0 });
   const formatPeopleCount = (
     state: StateData,
     metricKey:
@@ -525,6 +551,9 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     const estimated = Math.round((state[metricKey] / 100) * state.population);
     return `${estimated.toLocaleString()} people (est.)`;
   };
+  const selectedResources = selectedState ? getStateResources(selectedState.abbreviation) : null;
+  const selectedBurdenComposite = selectedState ? burdenCompositeByAbbreviation.get(selectedState.abbreviation) ?? 0 : 0;
+  const selectedResourceComposite = selectedState ? resourceCompositeByAbbreviation.get(selectedState.abbreviation) ?? 0 : 0;
   const provenanceTone: Record<NonNullable<typeof selectedFinancingProvenance>["level"], string> = {
     official_urs: "bg-emerald-100 text-emerald-800",
     official_cms_mhbg: "bg-blue-100 text-blue-800",
@@ -658,7 +687,9 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
             <div>
               <p className="text-sm font-semibold text-foreground">Map Year</p>
               <p className="text-xs text-muted-foreground">
-                Adjust the choropleth by year. Financing uses annual state financing records; burden, resource, and gap views recalculate state-specific values from the national trend series plus state-level variation.
+                {metricGroup === "financing" || metricGroup === "needFunding" || metricGroup === "typology"
+                  ? "Adjust the choropleth by year. Financing-related map views are limited to 2020-2024 because earlier years are not shown in the public choropleth."
+                  : "Adjust the choropleth by year. Burden, resource, and gap views recalculate state-specific values from the national trend series plus state-level variation."}
               </p>
             </div>
             <div className="text-2xl font-bold text-foreground">{selectedYear}</div>
@@ -1064,184 +1095,98 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                 <DialogDescription>{selectedState.abbreviation}</DialogDescription>
               </DialogHeader>
 
-              {/* Key Metrics - Core */}
-              <div className="my-6">
-                <h3 className="font-semibold text-lg mb-4">Core Mental Health Metrics</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 bg-purple-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Any Mental Illness</p>
-                    <p className="text-2xl font-bold text-foreground">{selectedState.ami}%</p>
-                    <p className="text-xs text-muted-foreground mt-2">{selectedState.ami_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "ami")}</p>
-                  </div>
-                  <div className="p-4 bg-orange-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Serious Mental Illness</p>
-                    <p className="text-2xl font-bold text-foreground">{selectedState.smi}%</p>
-                    <p className="text-xs text-muted-foreground mt-2">{selectedState.smi_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "smi")}</p>
-                  </div>
-                  <div className="p-4 bg-fuchsia-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Adult Major Depressive Episode</p>
-                    <p className="text-2xl font-bold text-foreground">{selectedState.mde_adult}%</p>
-                    <p className="text-xs text-muted-foreground mt-2">{selectedState.mde_adult_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "mde_adult")}</p>
-                  </div>
-                  <div className="p-4 bg-pink-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Youth Depression</p>
-                    <p className="text-2xl font-bold text-foreground">{selectedState.mde_youth}%</p>
-                    <p className="text-xs text-muted-foreground mt-2">{selectedState.mde_youth_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "mde_youth")}</p>
-                  </div>
-                  <div className="p-4 bg-purple-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Suicide Rate</p>
-                    <p className="text-2xl font-bold text-foreground">{selectedState.suicide_rate}</p>
-                    <p className="text-xs text-muted-foreground mt-2">per 100k population</p>
-                    {selectedState.suicide_deaths && (
-                      <p className="text-xs text-muted-foreground">
-                        {selectedState.suicide_deaths.toLocaleString()} deaths ({selectedState.suicide_source_year ?? "official"})
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Psychiatric Disorders */}
-              <div className="my-6">
-                <h3 className="font-semibold text-lg mb-4">Psychiatric Disorders Prevalence</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                  <div className="p-3 bg-fuchsia-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Adult Major Depressive Episode</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.mde_adult}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.mde_adult_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "mde_adult")}</p>
-                  </div>
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Anxiety</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.anxiety_disorder}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.anxiety_disorder_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "anxiety_disorder")}</p>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">PTSD</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.ptsd}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.ptsd_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "ptsd")}</p>
-                  </div>
-                  <div className="p-3 bg-red-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Substance Use</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.substance_use_disorder}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.substance_use_disorder_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "substance_use_disorder")}</p>
-                  </div>
-                  <div className="p-3 bg-orange-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Opioid Use</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.opioid_use_disorder}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.opioid_use_disorder_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "opioid_use_disorder")}</p>
-                  </div>
-                  <div className="p-3 bg-yellow-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Alcohol Use</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.alcohol_use_disorder}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.alcohol_use_disorder_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "alcohol_use_disorder")}</p>
-                  </div>
-                  <div className="p-3 bg-purple-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Bipolar</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.bipolar_disorder}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.bipolar_disorder_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "bipolar_disorder")}</p>
-                  </div>
-                  <div className="p-3 bg-pink-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Schizophrenia</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.schizophrenia}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.schizophrenia_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "schizophrenia")}</p>
-                  </div>
-                  <div className="p-3 bg-indigo-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Eating Disorder</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.eating_disorder}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.eating_disorder_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "eating_disorder")}</p>
-                  </div>
-                  <div className="p-3 bg-cyan-50 rounded-lg">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">ADHD</p>
-                    <p className="text-lg font-bold text-foreground">{selectedState.adhd}%</p>
-                    <p className="text-xs text-muted-foreground mt-1">{selectedState.adhd_per_capita.toLocaleString()} per 100k</p>
-                    <p className="text-xs text-muted-foreground">{formatPeopleCount(selectedState, "adhd")}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Resources */}
-              {getStateResources(selectedState.abbreviation) && (
+              {metricGroup === "conditions" && (MENTAL_METRICS as readonly string[]).includes(selectedMetric) && (
                 <div className="space-y-4 my-6">
-                  <h3 className="font-semibold text-lg">Mental Health Resources</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                      <Phone className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
-                      <div>
-                        <p className="font-semibold text-sm">Crisis Hotline</p>
-                        <p className="text-sm text-muted-foreground">{getStateResources(selectedState.abbreviation)?.hotline}</p>
-                      </div>
+                  <h3 className="font-semibold text-lg">Selected Mental Health Burden Metric</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-lg border bg-card md:col-span-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">{metricLabels[selectedMetric]}</p>
+                      <p className="text-3xl font-bold text-foreground">{formatMetricValue(selectedMetric, getDisplayValue(selectedState, selectedMetric))}</p>
+                      {selectedMetric === "suicide_rate" ? (
+                        <>
+                          <p className="text-sm text-muted-foreground mt-2">Deaths per 100,000 people in the selected year view.</p>
+                          {selectedState.suicide_deaths && (
+                            <p className="text-sm text-muted-foreground">
+                              {formatCount(selectedState.suicide_deaths)} total deaths ({selectedState.suicide_source_year ?? "official"})
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            {Math.round((getDisplayValue(selectedState, selectedMetric as MentalMetric) / 100) * 100000).toLocaleString()} per 100,000 people
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {Math.round((getDisplayValue(selectedState, selectedMetric as MentalMetric) / 100) * selectedState.population).toLocaleString()} people (estimated)
+                          </p>
+                        </>
+                      )}
                     </div>
-                    <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                      <MessageCircle className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
-                      <div>
-                        <p className="font-semibold text-sm">Crisis Text Line</p>
-                        <p className="text-sm text-muted-foreground">{getStateResources(selectedState.abbreviation)?.crisis_text}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Mental Health Providers</p>
-                      <p className="text-xl font-bold text-foreground">
-                        {getStateResources(selectedState.abbreviation)?.mental_health_providers}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Psychiatrists</p>
-                      <p className="text-xl font-bold text-foreground">
-                        {getStateResources(selectedState.abbreviation)?.psychiatrists}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Therapists</p>
-                      <p className="text-xl font-bold text-foreground">
-                        {getStateResources(selectedState.abbreviation)?.therapists}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Crisis-Capable Facilities</p>
-                      <p className="text-xl font-bold text-foreground">
-                        {getStateResources(selectedState.abbreviation)?.crisis_centers}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Mental Health Facilities</p>
-                      <p className="text-xl font-bold text-foreground">
-                        {getStateResources(selectedState.abbreviation)?.mental_health_facilities}
+                    <div className="p-4 rounded-lg border bg-muted/30">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Selected Year</p>
+                      <p className="text-3xl font-bold text-foreground">{selectedYear}</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        This modal is scoped to the currently selected burden metric rather than all disorder and resource sections.
                       </p>
                     </div>
                   </div>
-
-                  {getStateResources(selectedState.abbreviation)?.support_organizations && (
-                    <div>
-                      <p className="font-semibold text-sm mb-2">Support Organizations</p>
-                      <div className="flex flex-wrap gap-2">
-                        {getStateResources(selectedState.abbreviation)?.support_organizations.map((org, idx) => (
-                          <span key={idx} className="px-3 py-1 bg-primary/10 text-primary text-xs rounded-full">
-                            {org}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
-              {selectedFinancingRecord && (
+              {metricGroup === "resources" && selectedResources && (
+                <div className="space-y-4 my-6">
+                  <h3 className="font-semibold text-lg">Mental Health Resource Availability</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {RESOURCE_METRICS.map((resourceMetric) => {
+                      const displayValue = getDisplayValue(selectedState, resourceMetric);
+                      const total =
+                        resourceMetric === "crisis_centers_per_million"
+                          ? Math.round((displayValue / 1_000_000) * selectedState.population)
+                          : Math.round((displayValue / 100_000) * selectedState.population);
+                      return (
+                        <div
+                          key={resourceMetric}
+                          className={`p-4 rounded-lg border ${selectedMetric === resourceMetric ? "border-primary bg-primary/5" : "bg-card"}`}
+                        >
+                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">{metricLabels[resourceMetric]}</p>
+                          <p className="text-2xl font-bold text-foreground">{formatMetricValue(resourceMetric, displayValue)}</p>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            {resourceMetric === "crisis_centers_per_million" ? "per 1,000,000 people" : "per 100,000 people"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{formatCount(total)} total</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {metricGroup === "gap" && (
+                <div className="space-y-4 my-6">
+                  <h3 className="font-semibold text-lg">Burden-Resource Gap Snapshot</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-lg border bg-rose-50">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Gap Index</p>
+                      <p className="text-3xl font-bold text-foreground">{getGapValue(selectedState).toFixed(2)}</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Positive values mean burden is outpacing resource capacity.
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-lg border bg-orange-50">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Burden Composite</p>
+                      <p className="text-3xl font-bold text-foreground">{selectedBurdenComposite.toFixed(2)}</p>
+                      <p className="text-sm text-muted-foreground mt-2">Normalized across burden indicators for the selected year.</p>
+                    </div>
+                    <div className="p-4 rounded-lg border bg-emerald-50">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Resource Composite</p>
+                      <p className="text-3xl font-bold text-foreground">{selectedResourceComposite.toFixed(2)}</p>
+                      <p className="text-sm text-muted-foreground mt-2">Normalized across providers, therapists, psychiatrists, and crisis-capable facilities.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(metricGroup === "financing" || metricGroup === "needFunding" || metricGroup === "typology") && selectedFinancingRecord && (
                 <div className="space-y-4 my-6">
                   <h3 className="font-semibold text-lg">Mental Health Financing Snapshot ({selectedYear})</h3>
                   {selectedFinancingProvenance && (
@@ -1385,83 +1330,6 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                   </p>
                 </div>
               )}
-
-              {/* Forecast */}
-              <div className="space-y-4 my-6">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  10-Year Forecast (2024-2034)
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={generateForecast(selectedState)} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="year" stroke="#6b7280" />
-                    <YAxis stroke="#6b7280" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend />
-                    <Line type="monotone" dataKey="ami" stroke="#8b5cf6" strokeWidth={2} name="AMI %" dot={false} />
-                    <Line type="monotone" dataKey="smi" stroke="#f97316" strokeWidth={2} name="SMI %" dot={false} />
-                    <Line type="monotone" dataKey="mde_adult" stroke="#c026d3" strokeWidth={2} name="Adult MDE %" dot={false} />
-                    <Line type="monotone" dataKey="mde_youth" stroke="#ec4899" strokeWidth={2} name="Youth MDE %" dot={false} />
-                    <Line type="monotone" dataKey="suicide_rate" stroke="#a855f7" strokeWidth={2} name="Suicide Rate" dot={false} />
-                    <Line type="monotone" dataKey="anxiety_disorder" stroke="#3b82f6" strokeWidth={1.5} name="Anxiety" dot={false} />
-                    <Line type="monotone" dataKey="ptsd" stroke="#10b981" strokeWidth={1.5} name="PTSD" dot={false} />
-                    <Line type="monotone" dataKey="substance_use_disorder" stroke="#ef4444" strokeWidth={1.5} name="Substance Use" dot={false} />
-                    <Line type="monotone" dataKey="opioid_use_disorder" stroke="#f97316" strokeWidth={1.5} name="Opioid Use" dot={false} />
-                    <Line type="monotone" dataKey="alcohol_use_disorder" stroke="#eab308" strokeWidth={1.5} name="Alcohol Use" dot={false} />
-                    <Line type="monotone" dataKey="bipolar_disorder" stroke="#a855f7" strokeWidth={1.5} name="Bipolar" dot={false} />
-                    <Line type="monotone" dataKey="schizophrenia" stroke="#ec4899" strokeWidth={1.5} name="Schizophrenia" dot={false} />
-                    <Line type="monotone" dataKey="eating_disorder" stroke="#6366f1" strokeWidth={1.5} name="Eating Disorder" dot={false} />
-                    <Line type="monotone" dataKey="adhd" stroke="#06b6d4" strokeWidth={1.5} name="ADHD" dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Comparison */}
-              <div className="space-y-4 my-6">
-                <h3 className="font-semibold text-lg">State vs National Average</h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart
-                    data={[
-                      { metric: "AMI", state: selectedState.ami, national: 23.4 },
-                      { metric: "SMI", state: selectedState.smi, national: 5.6 },
-                      { metric: "Adult MDE", state: selectedState.mde_adult, national: 12.5 },
-                      { metric: "Youth MDE", state: selectedState.mde_youth, national: 20.2 },
-                      { metric: "Suicide", state: selectedState.suicide_rate, national: 14.5 },
-                      { metric: "Anxiety", state: selectedState.anxiety_disorder, national: 17.8 },
-                      { metric: "PTSD", state: selectedState.ptsd, national: 5.4 },
-                      { metric: "Substance", state: selectedState.substance_use_disorder, national: 9.5 },
-                      { metric: "Opioid", state: selectedState.opioid_use_disorder, national: 2.8 },
-                      { metric: "Alcohol", state: selectedState.alcohol_use_disorder, national: 6.2 },
-                      { metric: "Bipolar", state: selectedState.bipolar_disorder, national: 2.9 },
-                      { metric: "Schizo", state: selectedState.schizophrenia, national: 1.0 },
-                      { metric: "Eating", state: selectedState.eating_disorder, national: 1.6 },
-                      { metric: "ADHD", state: selectedState.adhd, national: 7.3 },
-                    ]}
-                    margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="metric" stroke="#6b7280" />
-                    <YAxis stroke="#6b7280" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#fff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="state" fill={metricColors[selectedMetric]} name={selectedState.abbreviation} />
-                    <Bar dataKey="national" fill="#cbd5e1" name="US Average" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
             </>
           )}
         </DialogContent>
