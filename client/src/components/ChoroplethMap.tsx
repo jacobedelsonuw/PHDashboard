@@ -15,6 +15,7 @@ import {
   financingMetricLabels,
   getFinancingMetricValue,
   getFinancingProvenanceSummary,
+  getFinancingSourceGapNote,
   getStateFinancingByYear,
   getStateFinancingRecord,
   getNationalFinancingTrend,
@@ -194,6 +195,9 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
     ? getStateFinancingRecord(selectedState.abbreviation, selectedYear as (typeof FINANCING_YEARS)[number])
     : null;
   const selectedFinancingProvenance = selectedFinancingRecord ? getFinancingProvenanceSummary(selectedFinancingRecord) : null;
+  const selectedFinancingGapNote = selectedState
+    ? getFinancingSourceGapNote(selectedState.abbreviation, selectedYear as (typeof FINANCING_YEARS)[number])
+    : undefined;
   const selectedFinancingTrend = useMemo(
     () =>
       selectedState
@@ -958,6 +962,11 @@ export default function ChoroplethMap({ metric = "ami" }: ChoroplethMapProps) {
                         ))}
                       </div>
                       <p className="text-sm text-muted-foreground">{selectedFinancingProvenance.note}</p>
+                    </div>
+                  )}
+                  {selectedFinancingGapNote && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      Source note: {selectedFinancingGapNote}
                     </div>
                   )}
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.request
 import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -64,15 +65,41 @@ def slugify(name: str) -> str:
 
 
 def fetch_text(url: str) -> str:
-    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
-    with urllib.request.urlopen(request, timeout=120) as response:
-        return response.read().decode('utf-8', errors='ignore')
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
+            with urllib.request.urlopen(request, timeout=120) as response:
+                return response.read().decode('utf-8', errors='ignore')
+        except Exception as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(1 + attempt)
+    raise last_error or ValueError(f'Could not fetch text from {url}')
 
 
 def fetch_bytes(url: str) -> bytes:
-    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
-    with urllib.request.urlopen(request, timeout=180) as response:
-        return response.read()
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
+            with urllib.request.urlopen(request, timeout=180) as response:
+                return response.read()
+        except Exception as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(1 + attempt)
+    raise last_error or ValueError(f'Could not fetch bytes from {url}')
+
+
+def fetch_text_from_first_available(urls: list[str]) -> str:
+    last_error: Exception | None = None
+    for url in urls:
+        try:
+            return fetch_text(url)
+        except Exception as exc:
+            last_error = exc
+    raise last_error or ValueError('Could not fetch any URS report page URL')
 
 
 def money_to_millions(raw: str | None) -> float:
@@ -362,9 +389,15 @@ def parse_state_filter() -> set[str] | None:
     return {part.strip().upper() for part in env_value.split(',') if part.strip()}
 
 
+def build_report_page_urls(state_name: str, abbreviation: str, year: int) -> list[str]:
+    return [
+        f'https://www.samhsa.gov/data/data-we-collect/urs-uniform-reporting-system/annual-report/{year}-{abbreviation.lower()}',
+        f'https://www.samhsa.gov/data/report/{year}-uniform-reporting-system-urs-table-{slugify(state_name)}',
+    ]
+
+
 def extract_state_year(state_name: str, abbreviation: str, year: int) -> tuple[str, int, dict[str, float | int | str]]:
-    report_url = f'https://www.samhsa.gov/data/report/{year}-uniform-reporting-system-urs-table-{slugify(state_name)}'
-    report_html = fetch_text(report_url)
+    report_html = fetch_text_from_first_available(build_report_page_urls(state_name, abbreviation, year))
     pdf_url = extract_pdf_url(report_html)
     pdf_bytes = fetch_bytes(pdf_url)
     base_chunks = extract_pdf_text_chunks(pdf_bytes)

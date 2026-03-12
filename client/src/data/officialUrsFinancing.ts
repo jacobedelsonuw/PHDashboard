@@ -1352,6 +1352,24 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
       "funding_total_millions": 993.52,
       "admin_gap_millions": 33.09
     },
+    "2022": {
+      "state": "Massachusetts",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 725.98,
+      "state_expenditures_from_state_sources_millions": 1014.02,
+      "total_smha_expenditures_millions": 1075.43,
+      "mhbg_millions": 13.11,
+      "covid_relief_mhbg_millions": 8.98,
+      "arp_mhbg_millions": 7.32,
+      "bsca_mhbg_millions": 0.0,
+      "medicaid_millions": 0.0,
+      "other_federal_millions": 6.52,
+      "state_funds_millions": 688.15,
+      "local_funds_millions": 0.0,
+      "other_millions": 0.0,
+      "funding_total_millions": 1041.71,
+      "admin_gap_millions": 33.72
+    },
     "2023": {
       "state": "Massachusetts",
       "sourceYear": 2023,
@@ -2377,6 +2395,24 @@ export const officialUrsFinancingByStateYear: Record<string, OfficialUrsFinancin
     }
   },
   NY: {
+    "2022": {
+      "state": "New York",
+      "sourceYear": 2022,
+      "community_mh_expenditures_millions": 3935.81,
+      "state_expenditures_from_state_sources_millions": 1680.2,
+      "total_smha_expenditures_millions": 6127.91,
+      "mhbg_millions": 43.01,
+      "covid_relief_mhbg_millions": 0.0,
+      "arp_mhbg_millions": 0.0,
+      "bsca_mhbg_millions": 0.0,
+      "medicaid_millions": 2052.8,
+      "other_federal_millions": 512.6,
+      "state_funds_millions": 652.5,
+      "local_funds_millions": 71.8,
+      "other_millions": 0.0,
+      "funding_total_millions": 3935.81,
+      "admin_gap_millions": 2192.1
+    },
     "2023": {
       "state": "New York",
       "sourceYear": 2023,

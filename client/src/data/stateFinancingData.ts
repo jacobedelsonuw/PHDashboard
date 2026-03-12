@@ -63,6 +63,24 @@ export const financingMetricLabels: Record<FinancingMetric, string> = {
   behavioral_health_policy_score: "Behavioral Health Policy Context Score",
 };
 
+const financingSourceGapNotes = new Map<string, string>([
+  [
+    "2021-MI",
+    "SAMHSA's official 2021 Michigan URS summary page lists the finance fields as '-' rather than numeric values, so the dashboard falls back to the harmonized model for that state-year.",
+  ],
+  [
+    "2021-MN",
+    "SAMHSA's official 2021 Minnesota URS summary page lists the finance fields as '-' rather than numeric values, so the dashboard falls back to the harmonized model for that state-year.",
+  ],
+  [
+    "2021-NY",
+    "SAMHSA's official 2021 New York URS summary page lists the finance fields as '-' rather than numeric values, so the dashboard falls back to the harmonized model for that state-year.",
+  ],
+]);
+
+export const getFinancingSourceGapNote = (abbreviation: string, year: FinancingYear) =>
+  financingSourceGapNotes.get(`${year}-${abbreviation}`);
+
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const round = (value: number, digits = 1) => {
   const factor = 10 ** digits;
