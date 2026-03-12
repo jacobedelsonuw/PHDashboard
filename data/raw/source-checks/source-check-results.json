@@ -1,0 +1,62 @@
+[
+  {
+    "slug": "samhsa-nsduh-state-releases",
+    "url": "https://www.samhsa.gov/data/data-we-collect/nsduh-national-survey-drug-use-and-health/state-releases/2023-2024",
+    "kind": "landing-page",
+    "ok": true,
+    "status": 200,
+    "contentType": "text/html; charset=UTF-8",
+    "finalUrl": "https://www.samhsa.gov/data/data-we-collect/nsduh-national-survey-drug-use-and-health/state-releases/2023-2024",
+    "checkedAt": "2026-03-12T00:03:59.657Z"
+  },
+  {
+    "slug": "samhsa-nsduh-state-prevalence",
+    "url": "https://www.samhsa.gov/data/report/2023-2024-nsduh-state-prevalence-estimates",
+    "kind": "landing-page",
+    "ok": true,
+    "status": 200,
+    "contentType": "text/html; charset=UTF-8",
+    "finalUrl": "https://www.samhsa.gov/data/report/2023-2024-nsduh-state-prevalence-estimates",
+    "checkedAt": "2026-03-12T00:04:00.386Z"
+  },
+  {
+    "slug": "samhsa-nsduh-state-totals",
+    "url": "https://www.samhsa.gov/data/report/2023-2024-nsduh-state-estimated-totals",
+    "kind": "landing-page",
+    "ok": false,
+    "status": 404,
+    "contentType": "text/html; charset=UTF-8",
+    "finalUrl": "https://www.samhsa.gov/data/report/2023-2024-nsduh-state-estimated-totals",
+    "checkedAt": "2026-03-12T00:04:00.999Z"
+  },
+  {
+    "slug": "hrsa-ahrf",
+    "url": "https://data.hrsa.gov/data/download?data=AHRF",
+    "kind": "landing-page",
+    "ok": true,
+    "status": 200,
+    "contentType": "text/html; charset=utf-8",
+    "finalUrl": "https://data.hrsa.gov/data/download?data=AHRF",
+    "checkedAt": "2026-03-12T00:04:01.366Z"
+  },
+  {
+    "slug": "samhsa-n-sumhss-state-profiles",
+    "url": "https://www.samhsa.gov/data/report/2023-n-sumhss-state-profiles",
+    "kind": "landing-page",
+    "ok": true,
+    "status": 200,
+    "contentType": "text/html; charset=UTF-8",
+    "finalUrl": "https://www.samhsa.gov/data/report/2023-n-sumhss-state-profiles",
+    "checkedAt": "2026-03-12T00:04:02.027Z"
+  },
+  {
+    "slug": "cdc-wonder-datasets",
+    "url": "https://wonder.cdc.gov/datasets.html",
+    "kind": "landing-page",
+    "ok": true,
+    "status": 200,
+    "contentType": "text/html;charset=UTF-8",
+    "finalUrl": "https://wonder.cdc.gov/datasets.html",
+    "checkedAt": "2026-03-12T00:04:02.293Z"
+  }
+]
