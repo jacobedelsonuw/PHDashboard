@@ -142,7 +142,7 @@ export default function Home() {
   const selectedNeedFundingRegression = getNeedFundingRegression(selectedFinancingAnalysisYear);
   const selectedNeedFundingScatter = getNeedFundingScatterSummary(selectedFinancingAnalysisYear);
   const persistentUnderinvestmentThreshold = getPersistentUnderfundingThreshold();
-  const persistentUnderinvestmentStates = getPersistentUnderinvestmentStates().slice(0, 10);
+  const persistentUnderinvestmentStates = getPersistentUnderinvestmentStates(selectedFinancingAnalysisYear).slice(0, 10);
   const selectedTypologySummary = getTypologySummaryByYear(selectedFinancingAnalysisYear);
   const expansionMismatchTrend = getExpansionMismatchTrend();
   const expansionMismatchDistribution = getExpansionMismatchDistribution(selectedFinancingAnalysisYear);
@@ -915,9 +915,9 @@ export default function Home() {
                       </p>
                     </div>
                     <div className="rounded-lg border bg-slate-50 p-4">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Latest Gap per Capita</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">{selectedFinancingAnalysisYear} Gap per Capita</p>
                       <p className="text-sm text-foreground">
-                        The most recent year&apos;s difference between actual public mental health spending per capita and predicted funding per capita for each state.
+                        The selected year&apos;s difference between actual public mental health spending per capita and predicted funding per capita for each state.
                       </p>
                     </div>
                   </div>
@@ -930,16 +930,21 @@ export default function Home() {
                         contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
                         formatter={(value: number, name: string) => {
                           if (name === "average_gap_per_capita") return [`$${value}`, "Average Gap per Capita"];
-                          return [`$${value}`, "Latest Gap per Capita"];
+                          return [`$${value}`, `${selectedFinancingAnalysisYear} Gap per Capita`];
                         }}
                       />
                       <Legend />
                       <Bar dataKey="average_gap_per_capita" fill="#dc2626" name="Average Gap per Capita" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey="latest_gap_per_capita" fill="#1d4ed8" name="Latest Gap per Capita" radius={[6, 6, 0, 0]} />
+                      <Bar
+                        dataKey="latest_gap_per_capita"
+                        fill="#1d4ed8"
+                        name={`${selectedFinancingAnalysisYear} Gap per Capita`}
+                        radius={[6, 6, 0, 0]}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                   <p className="text-xs text-muted-foreground">
-                    `Average Gap per Capita` summarizes each state&apos;s mean mismatch across the full financing panel. `Latest Gap per Capita` shows only the most recent observed year in the panel, so it is the current-period gap rather than a long-run average.
+                    `Average Gap per Capita` summarizes each state&apos;s mean mismatch across the full financing panel. `{selectedFinancingAnalysisYear} Gap per Capita` shows only the currently selected analysis year, so the chart updates when the year selector changes.
                   </p>
                   <div className="rounded-lg border p-4">
                     <h3 className="text-sm font-semibold text-foreground mb-1">

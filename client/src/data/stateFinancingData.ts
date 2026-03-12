@@ -670,24 +670,23 @@ export const getNeedFundingRegression = (year: FinancingYear) => regressionByYea
 
 export const getPersistentUnderfundingThreshold = () => persistentUnderfundingThreshold;
 
-export const getPersistentUnderinvestmentStates = () => {
-  const latestYear = FINANCING_YEARS[FINANCING_YEARS.length - 1];
+export const getPersistentUnderinvestmentStates = (year: FinancingYear = FINANCING_YEARS[FINANCING_YEARS.length - 1]) => {
   return stateData
     .map((state) => {
-      const latest = getStateFinancingRecord(state.abbreviation, latestYear)!;
+      const selectedYearRecord = getStateFinancingRecord(state.abbreviation, year)!;
       return {
-        state: latest.state,
-        abbreviation: latest.abbreviation,
-        average_gap_per_capita: latest.average_gap_per_capita,
-        gap_trend_per_year: latest.gap_trend_per_year,
-        gap_std_per_capita: latest.gap_std_per_capita,
-        negative_gap_years_share: latest.negative_gap_years_share,
-        persistent_underfunding: latest.persistent_underfunding,
-        latest_gap_per_capita: latest.funding_gap_per_capita,
-        latest_need_index: latest.need_index,
-        latest_public_mh_spending_per_capita: latest.public_mh_spending_per_capita,
-        latest_predicted_public_mh_spending_per_capita: latest.predicted_public_mh_spending_per_capita,
-        typology_cluster_label: latest.typology_cluster_label,
+        state: selectedYearRecord.state,
+        abbreviation: selectedYearRecord.abbreviation,
+        average_gap_per_capita: selectedYearRecord.average_gap_per_capita,
+        gap_trend_per_year: selectedYearRecord.gap_trend_per_year,
+        gap_std_per_capita: selectedYearRecord.gap_std_per_capita,
+        negative_gap_years_share: selectedYearRecord.negative_gap_years_share,
+        persistent_underfunding: selectedYearRecord.persistent_underfunding,
+        latest_gap_per_capita: selectedYearRecord.funding_gap_per_capita,
+        latest_need_index: selectedYearRecord.need_index,
+        latest_public_mh_spending_per_capita: selectedYearRecord.public_mh_spending_per_capita,
+        latest_predicted_public_mh_spending_per_capita: selectedYearRecord.predicted_public_mh_spending_per_capita,
+        typology_cluster_label: selectedYearRecord.typology_cluster_label,
       } as PersistentUnderinvestmentSummary;
     })
     .sort((left, right) => {
