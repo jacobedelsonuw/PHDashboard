@@ -772,7 +772,7 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle>Need-Funding Gap Score With Statistical Validation</CardTitle>
                   <CardDescription>
-                    Public mental health spending is modeled as a function of state need. The gap score is actual funding minus predicted funding, so negative values indicate underfunding relative to burden.
+                    Public mental health spending is modeled as a linear function of state need within each year. Predicted funding is the fitted per-capita spending value implied by that year&apos;s cross-state regression line for a given need index. The gap score is actual funding minus predicted funding, so negative values indicate underfunding relative to burden.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
@@ -907,6 +907,20 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="rounded-lg border bg-slate-50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Predicted Funding</p>
+                      <p className="text-sm text-foreground">
+                        The fitted public mental health spending per capita implied by the selected year&apos;s linear regression of spending on the need index.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Latest Gap per Capita</p>
+                      <p className="text-sm text-foreground">
+                        The most recent year&apos;s difference between actual public mental health spending per capita and predicted funding per capita for each state.
+                      </p>
+                    </div>
+                  </div>
                   <ResponsiveContainer width="100%" height={360}>
                     <BarChart data={persistentUnderinvestmentStates} margin={{ top: 5, right: 30, left: 0, bottom: 40 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -924,12 +938,15 @@ export default function Home() {
                       <Bar dataKey="latest_gap_per_capita" fill="#1d4ed8" name="Latest Gap per Capita" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                  <p className="text-xs text-muted-foreground">
+                    `Average Gap per Capita` summarizes each state&apos;s mean mismatch across the full financing panel. `Latest Gap per Capita` shows only the most recent observed year in the panel, so it is the current-period gap rather than a long-run average.
+                  </p>
                   <div className="rounded-lg border p-4">
                     <h3 className="text-sm font-semibold text-foreground mb-1">
                       Need Index vs Public Mental Health Spending per Capita
                     </h3>
                     <p className="text-xs text-muted-foreground mb-4">
-                      The regression line shows expected funding given need in {selectedFinancingAnalysisYear}. Labeled states are the largest positive or negative outliers relative to that line.
+                      The regression line shows predicted funding given need in {selectedFinancingAnalysisYear}. Labeled states are the largest positive or negative outliers relative to that line.
                     </p>
                     <ResponsiveContainer width="100%" height={340}>
                       <ComposedChart margin={{ top: 10, right: 25, left: 0, bottom: 10 }}>
@@ -1292,30 +1309,6 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-white">
-                <CardHeader>
-                  <CardTitle>Research Framing</CardTitle>
-                  <CardDescription>
-                    Policy surveillance framing for the financing and burden mismatch layer.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Primary Question</p>
-                    <p className="text-sm text-foreground">
-                      Which U.S. states exhibit persistent mismatch between mental health burden and public mental health financing?
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Secondary Questions</p>
-                    <div className="space-y-2 text-sm text-foreground">
-                      <p>1. Which states receive less funding than predicted given mental health burden?</p>
-                      <p>2. Are funding gaps persistent over time?</p>
-                      <p>3. Do states fall into distinct mental health system typologies?</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
         </Tabs>
