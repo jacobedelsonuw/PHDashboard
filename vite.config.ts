@@ -151,8 +151,16 @@ function vitePluginManusDebugCollector(): Plugin {
 }
 
 const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const githubRepoName = process.env.GITHUB_REPOSITORY?.split("/")[1];
+const isGitHubPagesBuild = process.env.GITHUB_ACTIONS === "true" && Boolean(githubRepoName);
+const pagesBase = isGitHubPagesBuild
+  ? githubRepoName === `${process.env.GITHUB_REPOSITORY_OWNER}.github.io`
+    ? "/"
+    : `/${githubRepoName}/`
+  : "/";
 
 export default defineConfig({
+  base: pagesBase,
   plugins,
   resolve: {
     alias: {
