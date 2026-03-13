@@ -201,6 +201,52 @@ export interface MedicaidExpansionPolicyRegressionSummary {
   caution: string;
 }
 
+export interface LateExpansionItsCoefficient {
+  term: "time" | "post" | "time_after";
+  label: string;
+  estimate: number;
+  standardError: number;
+  tStatistic: number;
+  pValue: number;
+}
+
+export interface LateExpansionItsStateSummary {
+  state: string;
+  abbreviation: string;
+  expansionYear: FinancingYear;
+  preYears: number;
+  postYears: number;
+  preMeanMismatchIndex: number;
+  postMeanMismatchIndex: number;
+  meanDifference: number;
+  levelChange: number;
+  levelPValue: number;
+  trendChange: number;
+  trendPValue: number;
+  latestMismatchIndex: number;
+}
+
+export interface LateExpansionItsEventPoint {
+  eventTime: number;
+  meanMismatchIndex: number;
+  stateCount: number;
+}
+
+export interface LateExpansionItsSummary {
+  includedStates: Array<{
+    state: string;
+    abbreviation: string;
+    expansionYear: FinancingYear;
+  }>;
+  outcomeLabel: string;
+  sampleSize: number;
+  adjustedRSquared: number;
+  coefficients: LateExpansionItsCoefficient[];
+  interpretation: string;
+  caution: string;
+  note: string;
+}
+
 export interface NeedFundingScatterPoint {
   state: string;
   abbreviation: string;
@@ -295,6 +341,104 @@ const normalCdf = (value: number) => {
     1 -
     (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x));
   return 0.5 * (1 + sign * erf);
+};
+
+const invertMatrix = (matrix: number[][]) => {
+  const size = matrix.length;
+  const augmented = matrix.map((row, rowIndex) => [
+    ...row.map((value) => value),
+    ...Array.from({ length: size }, (_, columnIndex) => (rowIndex === columnIndex ? 1 : 0)),
+  ]);
+
+  for (let pivotIndex = 0; pivotIndex < size; pivotIndex += 1) {
+    let pivotRow = pivotIndex;
+    for (let rowIndex = pivotIndex + 1; rowIndex < size; rowIndex += 1) {
+      if (Math.abs(augmented[rowIndex][pivotIndex]) > Math.abs(augmented[pivotRow][pivotIndex])) {
+        pivotRow = rowIndex;
+      }
+    }
+
+    const pivotValue = augmented[pivotRow][pivotIndex];
+    if (Math.abs(pivotValue) < 1e-10) return null;
+
+    if (pivotRow !== pivotIndex) {
+      [augmented[pivotIndex], augmented[pivotRow]] = [augmented[pivotRow], augmented[pivotIndex]];
+    }
+
+    for (let columnIndex = 0; columnIndex < size * 2; columnIndex += 1) {
+      augmented[pivotIndex][columnIndex] /= pivotValue;
+    }
+
+    for (let rowIndex = 0; rowIndex < size; rowIndex += 1) {
+      if (rowIndex === pivotIndex) continue;
+      const factor = augmented[rowIndex][pivotIndex];
+      if (factor === 0) continue;
+      for (let columnIndex = 0; columnIndex < size * 2; columnIndex += 1) {
+        augmented[rowIndex][columnIndex] -= factor * augmented[pivotIndex][columnIndex];
+      }
+    }
+  }
+
+  return augmented.map((row) => row.slice(size));
+};
+
+const fitLinearModel = (
+  rows: Array<{ y: number; predictors: number[] }>,
+  termNames: string[]
+) => {
+  if (!rows.length) return null;
+
+  const xMatrix = rows.map((row) => [1, ...row.predictors]);
+  const yVector = rows.map((row) => row.y);
+  const columnCount = xMatrix[0].length;
+  const xtx = Array.from({ length: columnCount }, () => Array.from({ length: columnCount }, () => 0));
+  const xty = Array.from({ length: columnCount }, () => 0);
+
+  xMatrix.forEach((row, rowIndex) => {
+    for (let leftIndex = 0; leftIndex < columnCount; leftIndex += 1) {
+      xty[leftIndex] += row[leftIndex] * yVector[rowIndex];
+      for (let rightIndex = 0; rightIndex < columnCount; rightIndex += 1) {
+        xtx[leftIndex][rightIndex] += row[leftIndex] * row[rightIndex];
+      }
+    }
+  });
+
+  const xtxInverse = invertMatrix(xtx);
+  if (!xtxInverse) return null;
+
+  const coefficients = xtxInverse.map((inverseRow) =>
+    inverseRow.reduce((sum, value, index) => sum + value * xty[index], 0)
+  );
+  const fittedValues = xMatrix.map((row) => row.reduce((sum, value, index) => sum + value * coefficients[index], 0));
+  const residuals = yVector.map((value, index) => value - fittedValues[index]);
+  const rss = residuals.reduce((sum, value) => sum + value ** 2, 0);
+  const yMean = mean(yVector);
+  const tss = yVector.reduce((sum, value) => sum + (value - yMean) ** 2, 0);
+  const degreesOfFreedom = Math.max(1, rows.length - columnCount);
+  const sigmaSquared = rss / degreesOfFreedom;
+  const standardErrors = xtxInverse.map((row, index) => Math.sqrt(Math.max(row[index] * sigmaSquared, 0)));
+  const coefficientRows = ["intercept", ...termNames].map((term, index) => {
+    const estimate = coefficients[index];
+    const standardError = standardErrors[index];
+    const tStatistic = standardError === 0 ? 0 : estimate / standardError;
+    const pValue = 2 * (1 - normalCdf(Math.abs(tStatistic)));
+
+    return {
+      term,
+      estimate,
+      standardError,
+      tStatistic,
+      pValue,
+    };
+  });
+
+  return {
+    coefficients: coefficientRows,
+    adjustedRSquared:
+      rows.length <= columnCount + 1 || tss === 0
+        ? 1
+        : 1 - (rss / (rows.length - columnCount)) / (tss / (rows.length - 1)),
+  };
 };
 
 const computeTrendSlope = (pairs: Array<{ x: number; y: number }>) => {
@@ -1125,7 +1269,130 @@ const medicaidExpansionPolicyRegression: MedicaidExpansionPolicyRegressionSummar
   };
 })();
 
+const FOCUSED_LATE_EXPANSION_STATE_ABBREVIATIONS = ["ME", "VA", "ID", "UT", "NE", "OK", "MO", "SD"] as const;
+
+const focusedLateExpansionRows = stateFinancingData.filter((record) =>
+  FOCUSED_LATE_EXPANSION_STATE_ABBREVIATIONS.includes(record.abbreviation as (typeof FOCUSED_LATE_EXPANSION_STATE_ABBREVIATIONS)[number])
+);
+
+const focusedLateExpansionStateSummaries: LateExpansionItsStateSummary[] = FOCUSED_LATE_EXPANSION_STATE_ABBREVIATIONS.map((abbreviation) => {
+  const rows = focusedLateExpansionRows
+    .filter((record) => record.abbreviation === abbreviation)
+    .sort((left, right) => left.year - right.year);
+  const expansionYear = rows[0]?.first_full_expansion_year ?? 2019;
+  const preRows = rows.filter((record) => record.year < expansionYear);
+  const postRows = rows.filter((record) => record.year >= expansionYear);
+  const stateModel = fitLinearModel(
+    rows.map((record) => ({
+      y: record.mismatch_index,
+      predictors: [record.year - FINANCING_YEARS[0], record.year >= expansionYear ? 1 : 0, record.year >= expansionYear ? record.year - expansionYear : 0],
+    })),
+    ["time", "post", "time_after"]
+  );
+  const coefficientByTerm = new Map(stateModel?.coefficients.map((coefficient) => [coefficient.term, coefficient]) ?? []);
+
+  return {
+    state: rows[0]?.state ?? abbreviation,
+    abbreviation,
+    expansionYear,
+    preYears: preRows.length,
+    postYears: postRows.length,
+    preMeanMismatchIndex: round(mean(preRows.map((record) => record.mismatch_index)), 2),
+    postMeanMismatchIndex: round(mean(postRows.map((record) => record.mismatch_index)), 2),
+    meanDifference: round(mean(postRows.map((record) => record.mismatch_index)) - mean(preRows.map((record) => record.mismatch_index)), 2),
+    levelChange: round(coefficientByTerm.get("post")?.estimate ?? 0, 3),
+    levelPValue: round(coefficientByTerm.get("post")?.pValue ?? 1, 4),
+    trendChange: round(coefficientByTerm.get("time_after")?.estimate ?? 0, 3),
+    trendPValue: round(coefficientByTerm.get("time_after")?.pValue ?? 1, 4),
+    latestMismatchIndex: round(rows[rows.length - 1]?.mismatch_index ?? 0, 2),
+  };
+}).sort((left, right) => left.expansionYear - right.expansionYear || left.abbreviation.localeCompare(right.abbreviation));
+
+const focusedLateExpansionItsSummary: LateExpansionItsSummary = (() => {
+  const orderedStates = Array.from(new Set(focusedLateExpansionRows.map((record) => record.abbreviation))).sort();
+  const referenceState = orderedStates[0];
+  const stackedModel = fitLinearModel(
+    focusedLateExpansionRows.map((record) => ({
+      y: record.mismatch_index,
+      predictors: [
+        ...orderedStates.slice(1).map((state) => (record.abbreviation === state ? 1 : 0)),
+        record.year - FINANCING_YEARS[0],
+        record.medicaid_expansion_status,
+        record.expansion_event_time !== null && record.expansion_event_time >= 0 ? record.expansion_event_time : 0,
+      ],
+    })),
+    [...orderedStates.slice(1).map((state) => `state_${state}`), "time", "post", "time_after"]
+  );
+  const coefficientByTerm = new Map(stackedModel?.coefficients.map((coefficient) => [coefficient.term, coefficient]) ?? []);
+  const postCoefficient = coefficientByTerm.get("post");
+  const timeAfterCoefficient = coefficientByTerm.get("time_after");
+
+  return {
+    includedStates: focusedLateExpansionStateSummaries.map((summary) => ({
+      state: summary.state,
+      abbreviation: summary.abbreviation,
+      expansionYear: summary.expansionYear,
+    })),
+    outcomeLabel: "Mismatch index (standardized need-funding gap score)",
+    sampleSize: focusedLateExpansionRows.length,
+    adjustedRSquared: round(stackedModel?.adjustedRSquared ?? 0, 3),
+    coefficients: [
+      {
+        term: "time",
+        label: "Pre-expansion slope",
+        estimate: round(coefficientByTerm.get("time")?.estimate ?? 0, 4),
+        standardError: round(coefficientByTerm.get("time")?.standardError ?? 0, 4),
+        tStatistic: round(coefficientByTerm.get("time")?.tStatistic ?? 0, 3),
+        pValue: round(coefficientByTerm.get("time")?.pValue ?? 1, 4),
+      },
+      {
+        term: "post",
+        label: "Immediate level change",
+        estimate: round(postCoefficient?.estimate ?? 0, 4),
+        standardError: round(postCoefficient?.standardError ?? 0, 4),
+        tStatistic: round(postCoefficient?.tStatistic ?? 0, 3),
+        pValue: round(postCoefficient?.pValue ?? 1, 4),
+      },
+      {
+        term: "time_after",
+        label: "Post-expansion slope change",
+        estimate: round(timeAfterCoefficient?.estimate ?? 0, 4),
+        standardError: round(timeAfterCoefficient?.standardError ?? 0, 4),
+        tStatistic: round(timeAfterCoefficient?.tStatistic ?? 0, 3),
+        pValue: round(timeAfterCoefficient?.pValue ?? 1, 4),
+      },
+    ],
+    interpretation:
+      (timeAfterCoefficient?.estimate ?? 0) < 0
+        ? "Across the late-adopting expansion states, the pooled interrupted time series does not show a common positive break in alignment at adoption. The dominant pattern is a more negative post-expansion slope in the mismatch index."
+        : "Across the late-adopting expansion states, the pooled interrupted time series suggests improving alignment after adoption through a more positive post-expansion slope.",
+    caution:
+      "This focused ITS is descriptive. The late-adopter sample is small, state heterogeneity is substantial, and it does not by itself identify a causal effect of Medicaid expansion on financing alignment.",
+    note: `State fixed effects are included in the pooled segmented model. The reference state for the dummy set is ${referenceState}. North Carolina is excluded because the current panel has only one post-expansion year.`,
+  };
+})();
+
+const focusedLateExpansionEventTrend: LateExpansionItsEventPoint[] = (() => {
+  const grouped = new Map<number, StateFinancingRecord[]>();
+
+  focusedLateExpansionRows.forEach((record) => {
+    if (record.expansion_event_time === null) return;
+    grouped.set(record.expansion_event_time, [...(grouped.get(record.expansion_event_time) ?? []), record]);
+  });
+
+  return Array.from(grouped.entries())
+    .map(([eventTime, rows]) => ({
+      eventTime,
+      meanMismatchIndex: round(mean(rows.map((row) => row.mismatch_index)), 3),
+      stateCount: rows.length,
+    }))
+    .sort((left, right) => left.eventTime - right.eventTime);
+})();
+
 export const getMedicaidExpansionPolicyRegression = () => medicaidExpansionPolicyRegression;
+export const getFocusedLateExpansionItsSummary = () => focusedLateExpansionItsSummary;
+export const getFocusedLateExpansionStateSummaries = () => focusedLateExpansionStateSummaries;
+export const getFocusedLateExpansionEventTrend = () => focusedLateExpansionEventTrend;
 
 export const getNeedFundingScatterSummary = (year: FinancingYear): NeedFundingScatterSummary => {
   const points = getStateFinancingByYear(year)
