@@ -4,6 +4,10 @@ import { officialMhbgAwardsByStateYear } from "./officialMhbgAwards";
 import { officialUrsFinancingByStateYear } from "./officialUrsFinancing";
 import { getMedicaidExpansionRecord } from "./medicaidExpansionData";
 import type { MedicaidExpansionLabel, MedicaidExpansionStatus } from "./medicaidExpansionData";
+import {
+  externalSpatialNeedFundingDiagnostics,
+  externalSpatialNeedFundingResults,
+} from "./spatialNeedFundingResults";
 
 export const FINANCING_YEARS = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024] as const;
 export type FinancingYear = (typeof FINANCING_YEARS)[number];
@@ -91,6 +95,20 @@ export interface NeedFundingRegressionSummary {
   residualStd: number;
   sampleSize: number;
   significant: boolean;
+  modelType: "linear_ols" | "external_spatial";
+  modelLabel: string;
+  sourceNote: string;
+}
+
+export interface NeedIndexMethodSummary {
+  method: "pca";
+  indicators: Array<{
+    key: "ami" | "smi" | "mde_adult" | "mde_youth" | "suicide_rate" | "substance_use_disorder";
+    label: string;
+    loading: number;
+  }>;
+  varianceExplained: number;
+  sourceNote: string;
 }
 
 export interface PersistentUnderinvestmentSummary {
@@ -291,34 +309,103 @@ const computeTrendSlope = (pairs: Array<{ x: number; y: number }>) => {
 const euclideanDistance = (left: number[], right: number[]) =>
   Math.sqrt(left.reduce((sum, value, index) => sum + (value - right[index]) ** 2, 0));
 
-const needProfiles = stateData.map((state) => {
-  const rawNeed =
-    state.ami * 0.35 +
-    state.smi * 1.6 +
-    state.mde_adult * 0.9 +
-    state.mde_youth * 0.45 +
-    state.suicide_rate * 0.4 +
-    state.substance_use_disorder * 0.75;
+const dotProduct = (left: number[], right: number[]) => left.reduce((sum, value, index) => sum + value * right[index], 0);
+const normalizeVector = (vector: number[]) => {
+  const magnitude = Math.sqrt(dotProduct(vector, vector));
+  return magnitude === 0 ? vector.map(() => 0) : vector.map((value) => value / magnitude);
+};
+const multiplyMatrixVector = (matrix: number[][], vector: number[]) =>
+  matrix.map((row) => dotProduct(row, vector));
+const powerIteration = (matrix: number[][], iterations = 40) => {
+  let vector = normalizeVector(Array.from({ length: matrix.length }, () => 1));
+
+  for (let index = 0; index < iterations; index += 1) {
+    const nextVector = normalizeVector(multiplyMatrixVector(matrix, vector));
+    const delta = nextVector.reduce((sum, value, valueIndex) => sum + Math.abs(value - vector[valueIndex]), 0);
+    vector = nextVector;
+    if (delta < 1e-8) break;
+  }
+
+  return vector;
+};
+
+const NEED_INDICATORS = [
+  { key: "ami", label: "Any mental illness" },
+  { key: "smi", label: "Serious mental illness" },
+  { key: "mde_adult", label: "Adult major depressive episode" },
+  { key: "mde_youth", label: "Youth major depressive episode" },
+  { key: "suicide_rate", label: "Suicide mortality" },
+  { key: "substance_use_disorder", label: "Substance use disorder" },
+] as const;
+
+type NeedIndicatorKey = (typeof NEED_INDICATORS)[number]["key"];
+
+const derivePcaNeedIndex = () => {
+  const standardizedColumns = NEED_INDICATORS.map(({ key }) => {
+    const values = stateData.map((state) => state[key]);
+    const columnMean = mean(values);
+    const columnStd = standardDeviation(values) || 1;
+    return values.map((value) => (value - columnMean) / columnStd);
+  });
+
+  const rowVectors = stateData.map((_, rowIndex) => standardizedColumns.map((column) => column[rowIndex]));
+  const featureCount = NEED_INDICATORS.length;
+  const correlationMatrix = Array.from({ length: featureCount }, (_, rowIndex) =>
+    Array.from({ length: featureCount }, (_, columnIndex) => {
+      const rowColumn = standardizedColumns[rowIndex];
+      const columnColumn = standardizedColumns[columnIndex];
+      return rowColumn.reduce((sum, value, index) => sum + value * columnColumn[index], 0) / rowColumn.length;
+    })
+  );
+
+  let eigenvector = powerIteration(correlationMatrix);
+  let scores = rowVectors.map((row) => dotProduct(row, eigenvector));
+  const burdenDirection = mean(
+    scores.map((score, index) => score * rowVectors[index].reduce((sum, value) => sum + value, 0))
+  );
+
+  if (burdenDirection < 0) {
+    eigenvector = eigenvector.map((value) => -value);
+    scores = scores.map((value) => -value);
+  }
+
+  const eigenvalue = dotProduct(eigenvector, multiplyMatrixVector(correlationMatrix, eigenvector));
+  const minScore = Math.min(...scores);
+  const maxScore = Math.max(...scores);
+  const loadingSummaries = NEED_INDICATORS.map((indicator, index) => ({
+    key: indicator.key,
+    label: indicator.label,
+    loading: round(eigenvector[index], 3),
+  }));
 
   return {
-    abbreviation: state.abbreviation,
-    rawNeed,
+    scoresByState: new Map(
+      stateData.map((state, index) => [
+        state.abbreviation,
+        {
+          rawNeed: scores[index],
+          needIndex: maxScore === minScore ? 50 : round(((scores[index] - minScore) / (maxScore - minScore)) * 100, 1),
+          modeledScalar: maxScore === minScore ? 1 : 0.75 + ((scores[index] - minScore) / (maxScore - minScore)) * 0.7,
+        },
+      ])
+    ),
+    methodSummary: {
+      method: "pca" as const,
+      indicators: loadingSummaries,
+      varianceExplained: round(eigenvalue / featureCount, 3),
+      sourceNote:
+        "Need index is the first principal component of AMI, SMI, adult MDE, youth MDE, suicide mortality, and substance use disorder. Higher values indicate higher latent burden.",
+    },
   };
-});
+};
 
-const minNeed = Math.min(...needProfiles.map((profile) => profile.rawNeed));
-const maxNeed = Math.max(...needProfiles.map((profile) => profile.rawNeed));
+const pcaNeedIndex = derivePcaNeedIndex();
+
 const modeledNeedIndexByState = new Map(
-  needProfiles.map((profile) => [
-    profile.abbreviation,
-    maxNeed === minNeed ? 1 : 0.75 + ((profile.rawNeed - minNeed) / (maxNeed - minNeed)) * 0.7,
-  ])
+  stateData.map((state) => [state.abbreviation, pcaNeedIndex.scoresByState.get(state.abbreviation)?.modeledScalar ?? 1])
 );
 const needIndexScoreByState = new Map(
-  needProfiles.map((profile) => [
-    profile.abbreviation,
-    maxNeed === minNeed ? 50 : round(((profile.rawNeed - minNeed) / (maxNeed - minNeed)) * 100, 1),
-  ])
+  stateData.map((state) => [state.abbreviation, pcaNeedIndex.scoresByState.get(state.abbreviation)?.needIndex ?? 50])
 );
 
 const providerDensityByState = new Map(
@@ -445,7 +532,7 @@ const baseStateFinancingData = FINANCING_YEARS.flatMap((year) => {
       federal_mental_health_funding_per_capita: round((federalMentalHealthFundingMillions * 1_000_000) / state.population, 2),
       public_mh_spending_per_capita: round((publicMhSpendingMillions * 1_000_000) / state.population, 2),
       behavioral_health_policy_score: policyScore,
-      raw_need_score: needProfiles.find((profile) => profile.abbreviation === state.abbreviation)?.rawNeed ?? 0,
+      raw_need_score: pcaNeedIndex.scoresByState.get(state.abbreviation)?.rawNeed ?? 0,
       need_index: needIndexScore,
       provider_density_per_100k: providerDensity,
     };
@@ -453,6 +540,15 @@ const baseStateFinancingData = FINANCING_YEARS.flatMap((year) => {
 });
 
 const regressionByYear = new Map<FinancingYear, NeedFundingRegressionSummary>();
+const externalSpatialResultsByKey = new Map(
+  externalSpatialNeedFundingResults.map((result) => [`${result.abbreviation}-${result.year}`, result] as const)
+);
+const externalSpatialDiagnosticsByYear = new Map(
+  externalSpatialNeedFundingDiagnostics.map((diagnostic) => [diagnostic.year as FinancingYear, diagnostic] as const)
+);
+const yearsWithExternalSpatialResults = new Set(
+  externalSpatialNeedFundingResults.map((result) => result.year as FinancingYear)
+);
 
 FINANCING_YEARS.forEach((year) => {
   const rows = baseStateFinancingData.filter((record) => record.year === year);
@@ -470,6 +566,8 @@ FINANCING_YEARS.forEach((year) => {
   const residualStd = rows.length > 2 ? Math.sqrt(rss / (rows.length - 2)) : 0;
   const slopeStdError = rows.length > 2 && ssxx > 0 ? residualStd / Math.sqrt(ssxx) : 0;
   const tStatistic = slopeStdError > 0 ? slope / slopeStdError : 0;
+  const externalSpatialDiagnostic = externalSpatialDiagnosticsByYear.get(year);
+  const usesExternalSpatial = yearsWithExternalSpatialResults.has(year);
 
   regressionByYear.set(year, {
     year,
@@ -480,15 +578,33 @@ FINANCING_YEARS.forEach((year) => {
     residualStd: round(residualStd, 2),
     sampleSize: rows.length,
     significant: Math.abs(tStatistic) >= 2,
+    modelType: usesExternalSpatial ? "external_spatial" : "linear_ols",
+    modelLabel: usesExternalSpatial
+      ? externalSpatialDiagnostic?.model_label ?? "External spatial model"
+      : "Browser OLS baseline",
+    sourceNote: usesExternalSpatial
+      ? externalSpatialDiagnostic?.note ??
+        "State-year predicted funding values are being supplied from an external spatial model file rather than estimated in-browser."
+      : "Need index is PCA-derived, but predicted funding is currently estimated in-browser with a same-year cross-state OLS baseline until external spatial-model results are supplied.",
   });
 });
 
 const recordsWithGap = baseStateFinancingData.map((record) => {
   const regression = regressionByYear.get(record.year)!;
-  const predicted = round(regression.intercept + regression.slope * record.need_index, 2);
-  const gap = round(record.public_mh_spending_per_capita - predicted, 2);
+  const externalSpatialResult = externalSpatialResultsByKey.get(`${record.abbreviation}-${record.year}`);
+  const predicted = round(
+    externalSpatialResult?.predicted_public_mh_spending_per_capita ?? regression.intercept + regression.slope * record.need_index,
+    2
+  );
+  const gap = round(
+    externalSpatialResult?.funding_gap_per_capita ?? record.public_mh_spending_per_capita - predicted,
+    2
+  );
   const gapPercent = round(predicted === 0 ? 0 : (gap / predicted) * 100, 1);
-  const gapScore = round(regression.residualStd === 0 ? 0 : gap / regression.residualStd, 2);
+  const gapScore = round(
+    externalSpatialResult?.funding_gap_score ?? (regression.residualStd === 0 ? 0 : gap / regression.residualStd),
+    2
+  );
 
   return {
     ...record,
@@ -691,6 +807,7 @@ export const getStateFinancingByYear = (year: FinancingYear) =>
 export const getFinancingMetricValue = (record: StateFinancingRecord, metric: FinancingMetric) => record[metric];
 
 export const getNeedFundingRegression = (year: FinancingYear) => regressionByYear.get(year)!;
+export const getNeedIndexMethodSummary = (): NeedIndexMethodSummary => pcaNeedIndex.methodSummary;
 
 export const getPersistentUnderfundingThreshold = () => persistentUnderfundingThreshold;
 
@@ -1030,10 +1147,13 @@ export const getNeedFundingScatterSummary = (year: FinancingYear): NeedFundingSc
 
   return {
     points,
-    line: [minNeedValue, maxNeedValue].map((needIndex) => ({
-      need_index: needIndex,
-      predicted_public_mh_spending_per_capita: round(regression.intercept + regression.slope * needIndex, 2),
-    })),
+    line:
+      regression.modelType === "linear_ols"
+        ? [minNeedValue, maxNeedValue].map((needIndex) => ({
+            need_index: needIndex,
+            predicted_public_mh_spending_per_capita: round(regression.intercept + regression.slope * needIndex, 2),
+          }))
+        : [],
     outliers: [...points]
       .sort((left, right) => Math.abs(right.funding_gap_score) - Math.abs(left.funding_gap_score))
       .slice(0, 8),
@@ -1046,6 +1166,7 @@ export const getGapScoreExportRows = (year: FinancingYear) =>
       state: record.state,
       abbreviation: record.abbreviation,
       year: record.year,
+      raw_need_score: round(record.raw_need_score, 4),
       need_index: record.need_index,
       public_mh_spending_per_capita: record.public_mh_spending_per_capita,
       predicted_public_mh_spending_per_capita: record.predicted_public_mh_spending_per_capita,
@@ -1084,6 +1205,7 @@ export const getTypologyExportRows = (year: FinancingYear) =>
       typology_cluster_label: record.typology_cluster_label,
       typology_cluster_description: record.typology_cluster_description,
       typology_cluster_color: record.typology_cluster_color,
+      raw_need_score: round(record.raw_need_score, 4),
       need_index: record.need_index,
       public_mh_spending_per_capita: record.public_mh_spending_per_capita,
       medicaid_share_of_public_mh: record.medicaid_share_of_public_mh,
@@ -1091,3 +1213,38 @@ export const getTypologyExportRows = (year: FinancingYear) =>
       persistent_underfunding: record.persistent_underfunding,
     }))
     .sort((left, right) => left.state.localeCompare(right.state));
+
+export const getSpatialNeedFundingPanelRows = () =>
+  stateFinancingData
+    .map((record) => {
+      const state = stateData.find((entry) => entry.abbreviation === record.abbreviation)!;
+      return {
+        state: record.state,
+        abbreviation: record.abbreviation,
+        year: record.year,
+        lat: state.lat,
+        lng: state.lng,
+        population: state.population,
+        raw_need_score: round(record.raw_need_score, 4),
+        need_index: record.need_index,
+        ami: round(state.ami, 2),
+        smi: round(state.smi, 2),
+        mde_adult: round(state.mde_adult, 2),
+        mde_youth: round(state.mde_youth, 2),
+        suicide_rate: round(state.suicide_rate, 2),
+        substance_use_disorder: round(state.substance_use_disorder, 2),
+        public_mh_spending_per_capita: record.public_mh_spending_per_capita,
+        predicted_public_mh_spending_per_capita: record.predicted_public_mh_spending_per_capita,
+        funding_gap_per_capita: record.funding_gap_per_capita,
+        funding_gap_score: record.funding_gap_score,
+        medicaid_share_of_public_mh: record.medicaid_share_of_public_mh,
+        provider_density_per_100k: record.provider_density_per_100k,
+        medicaid_expansion_status: record.medicaid_expansion_status,
+        medicaid_expansion_label: record.medicaid_expansion_label,
+        financing_status: getFinancingProvenanceSummary(record).label,
+      };
+    })
+    .sort((left, right) => {
+      if (left.year !== right.year) return left.year - right.year;
+      return left.state.localeCompare(right.state);
+    });

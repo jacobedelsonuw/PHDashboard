@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-03-13T17:13:54.091Z",
+  "row_count": 450,
+  "need_index_method": {
+    "method": "pca",
+    "indicators": [
+      {
+        "key": "ami",
+        "label": "Any mental illness",
+        "loading": 0.47
+      },
+      {
+        "key": "smi",
+        "label": "Serious mental illness",
+        "loading": 0.463
+      },
+      {
+        "key": "mde_adult",
+        "label": "Adult major depressive episode",
+        "loading": 0.482
+      },
+      {
+        "key": "mde_youth",
+        "label": "Youth major depressive episode",
+        "loading": 0.396
+      },
+      {
+        "key": "suicide_rate",
+        "label": "Suicide mortality",
+        "loading": 0.29
+      },
+      {
+        "key": "substance_use_disorder",
+        "label": "Substance use disorder",
+        "loading": 0.304
+      }
+    ],
+    "varianceExplained": 0.641,
+    "sourceNote": "Need index is the first principal component of AMI, SMI, adult MDE, youth MDE, suicide mortality, and substance use disorder. Higher values indicate higher latent burden."
+  },
+  "note": "Estimate SAR/SEM offline and write predictions into client/src/data/spatialNeedFundingResults.ts."
+}

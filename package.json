@@ -13,7 +13,8 @@
     "sources:check": "node scripts/check-source-catalog.mjs",
     "sources:extract": "node scripts/extract-official-nsduh-state-metrics.mjs && node scripts/extract-official-cdc-suicide-rates.mjs && node scripts/extract-official-resource-capacity.mjs && node scripts/extract-official-mhbg-awards.mjs",
     "sources:extract:cms": "python3 scripts/extract-official-cms-medicaid-expenditures.py",
-    "sources:extract:urs": "python3 scripts/extract-official-urs-financing.py"
+    "sources:extract:urs": "python3 scripts/extract-official-urs-financing.py",
+    "analysis:export:spatial": "pnpm exec tsx scripts/export-spatial-need-funding-input.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

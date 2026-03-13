@@ -45,6 +45,7 @@ import {
   getFinancingProvenanceSummary,
   getMedicaidExpansionPolicyRegression,
   getNationalFinancingTrend,
+  getNeedIndexMethodSummary,
   getNeedFundingRegression,
   getNeedFundingScatterSummary,
   getPersistentUnderfundingThreshold,
@@ -136,6 +137,7 @@ export default function Home() {
     .slice(0, 12);
   const latestFinancingYear = FINANCING_YEARS[FINANCING_YEARS.length - 1];
   const nationalFinancingTrend = getNationalFinancingTrend();
+  const needIndexMethodSummary = getNeedIndexMethodSummary();
   const latestFinancingAllStates = getStateFinancingByYear(latestFinancingYear);
   const latestFinancingStates = [...latestFinancingAllStates]
     .sort((a, b) => b.public_mh_spending_per_capita - a.public_mh_spending_per_capita)
@@ -777,7 +779,7 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle>Need-Funding Gap Score With Statistical Validation</CardTitle>
                   <CardDescription>
-                    Public mental health spending is modeled as a linear function of state need within each year. Predicted funding is the fitted per-capita spending value implied by that year&apos;s cross-state regression line for a given need index. The gap score is actual funding minus predicted funding, so negative values indicate underfunding relative to burden.
+                    State need is summarized with a PCA-derived burden index built from AMI, SMI, adult MDE, youth MDE, suicide mortality, and substance use disorder. Predicted funding currently uses a same-year cross-state baseline model inside the dashboard unless an external spatial model file is supplied. Gap values are actual public mental health spending minus predicted spending, so negative values indicate underfunding relative to burden.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
@@ -912,11 +914,26 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
+                  <div className="rounded-lg border bg-slate-50 p-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Need index construction</p>
+                    <p className="text-sm text-foreground">
+                      First principal component; {Math.round(needIndexMethodSummary.varianceExplained * 100)}% of variance explained. Highest absolute loadings:
+                      {" "}
+                      {needIndexMethodSummary.indicators
+                        .slice()
+                        .sort((left, right) => Math.abs(right.loading) - Math.abs(left.loading))
+                        .slice(0, 3)
+                        .map((indicator) => `${indicator.label} (${indicator.loading})`)
+                        .join(", ")}
+                      .
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">{selectedNeedFundingRegression.sourceNote}</p>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="rounded-lg border bg-slate-50 p-4">
                       <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Predicted Funding</p>
                       <p className="text-sm text-foreground">
-                        The fitted public mental health spending per capita implied by the selected year&apos;s linear regression of spending on the need index.
+                        The model-implied public mental health spending per capita for a state with that burden profile in the selected year. When no external spatial results are loaded, this is the fitted value from the dashboard&apos;s same-year OLS baseline using the PCA-derived need index.
                       </p>
                     </div>
                     <div className="rounded-lg border bg-slate-50 p-4">
@@ -959,7 +976,9 @@ export default function Home() {
                       Need Index vs Public Mental Health Spending per Capita
                     </h3>
                     <p className="text-xs text-muted-foreground mb-4">
-                      The regression line shows predicted funding given need in {selectedFinancingAnalysisYear}. Labeled states are the largest positive or negative outliers relative to that line.
+                      {selectedNeedFundingRegression.modelType === "external_spatial"
+                        ? `Points show actual spending against the PCA-derived need index in ${selectedFinancingAnalysisYear}. Predicted values are coming from an external spatial model file, so labeled states are the largest positive or negative outliers relative to those spatial predictions.`
+                        : `The reference line shows predicted funding given need in ${selectedFinancingAnalysisYear}. Labeled states are the largest positive or negative outliers relative to that baseline.`}
                     </p>
                     <ResponsiveContainer width="100%" height={340}>
                       <ComposedChart margin={{ top: 10, right: 25, left: 0, bottom: 10 }}>
