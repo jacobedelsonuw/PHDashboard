@@ -779,7 +779,7 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle>Need-Funding Gap Score With Statistical Validation</CardTitle>
                   <CardDescription>
-                    State need is summarized with a PCA-derived burden index built from AMI, SMI, adult MDE, youth MDE, suicide mortality, and substance use disorder. Predicted funding currently uses a same-year cross-state baseline model inside the dashboard unless an external spatial model file is supplied. Gap values are actual public mental health spending minus predicted spending, so negative values indicate underfunding relative to burden.
+                    State need is summarized with a PCA-derived burden index built from AMI, SMI, adult MDE, youth MDE, suicide mortality, and substance use disorder. Predicted funding is taken from the fitted spatial model for the selected year, using queen contiguity weights with nearest-neighbor fallback only for isolated states. Gap values are actual public mental health spending minus predicted spending, so negative values indicate underfunding relative to burden.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
@@ -933,7 +933,7 @@ export default function Home() {
                     <div className="rounded-lg border bg-slate-50 p-4">
                       <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Predicted Funding</p>
                       <p className="text-sm text-foreground">
-                        The model-implied public mental health spending per capita for a state with that burden profile in the selected year. When no external spatial results are loaded, this is the fitted value from the dashboard&apos;s same-year OLS baseline using the PCA-derived need index.
+                        The fitted public mental health spending per capita for a state with that burden profile in the selected year under the spatial need-funding model. The live dashboard is currently using a spatial error specification with queen contiguity weights and nearest-neighbor fallback for isolated states.
                       </p>
                     </div>
                     <div className="rounded-lg border bg-slate-50 p-4">
@@ -977,7 +977,7 @@ export default function Home() {
                     </h3>
                     <p className="text-xs text-muted-foreground mb-4">
                       {selectedNeedFundingRegression.modelType === "external_spatial"
-                        ? `Points show actual spending against the PCA-derived need index in ${selectedFinancingAnalysisYear}. Predicted values are coming from an external spatial model file, so labeled states are the largest positive or negative outliers relative to those spatial predictions.`
+                        ? `Points show actual spending against the PCA-derived need index in ${selectedFinancingAnalysisYear}. Predicted values come from the fitted spatial model, so labeled states are the largest positive or negative outliers relative to those spatial predictions.`
                         : `The reference line shows predicted funding given need in ${selectedFinancingAnalysisYear}. Labeled states are the largest positive or negative outliers relative to that baseline.`}
                     </p>
                     <ResponsiveContainer width="100%" height={340}>
@@ -1559,7 +1559,7 @@ export default function Home() {
               </div>
             ))}
             <p className="text-sm text-muted-foreground">
-              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS; and the financing layer now uses direct SAMHSA MHBG award tables, direct SAMHSA URS state financing extracts where available, direct CMS Financial Management Report Medicaid expenditure workbooks where available, and KFF policy context for the broader state-year comparison view. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
+              Interpretation note: U.S. national trend figures are source-aligned. State-level AMI, SMI, adult MDE, youth MDE, substance use disorder, alcohol use disorder, and opioid use disorder come from official SAMHSA NSDUH 2023-2024 tables; suicide mortality comes from the official CDC NCHS 2023 state table; resource-capacity layers come from HRSA AHRF and SAMHSA N-SUMHSS; and the financing layer uses direct SAMHSA MHBG award tables, direct SAMHSA URS state financing extracts where available, direct CMS Financial Management Report Medicaid expenditure workbooks where available, KFF policy context for broader state-year comparison, and a fitted spatial error model with contiguity weights for the live need-funding gap layer. Country comparisons, forecast layers, burden-resource gap views, and the remaining disorder-specific state series are still mixed or modeled for visualization and planning discussion.
             </p>
             <div className="pt-2">
               <h4 className="font-semibold text-foreground mb-3">Metric Provenance Status</h4>

@@ -584,7 +584,7 @@ FINANCING_YEARS.forEach((year) => {
       : "Browser OLS baseline",
     sourceNote: usesExternalSpatial
       ? externalSpatialDiagnostic?.note ??
-        "State-year predicted funding values are being supplied from an external spatial model file rather than estimated in-browser."
+        "Predicted funding is coming from the fitted spatial model for this year rather than the in-browser baseline."
       : "Need index is PCA-derived, but predicted funding is currently estimated in-browser with a same-year cross-state OLS baseline until external spatial-model results are supplied.",
   });
 });
