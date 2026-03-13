@@ -2,7 +2,7 @@
 
 options(stringsAsFactors = FALSE)
 
-required_packages <- c("readr", "dplyr", "sf", "spdep", "spatialreg", "USAboundaries")
+required_packages <- c("readr", "dplyr", "sf", "spdep", "spatialreg")
 missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing_packages) > 0) {
   install.packages(missing_packages, repos = "https://cloud.r-project.org")
@@ -14,7 +14,6 @@ suppressPackageStartupMessages({
   library(sf)
   library(spdep)
   library(spatialreg)
-  library(USAboundaries)
 })
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -30,6 +29,10 @@ state_lookup <- panel %>%
 
 build_weights <- function(lookup) {
   polygon_attempt <- tryCatch({
+    if (!requireNamespace("USAboundaries", quietly = TRUE)) {
+      stop("USAboundaries package is not installed.")
+    }
+
     states_sf <- USAboundaries::us_states(resolution = "low")
     states_names <- names(states_sf)
     abbr_col <- intersect(states_names, c("state_abbr", "stusps", "STUSPS"))[[1]]

@@ -1,0 +1,10 @@
+year,model_label,model_type,note
+2016,Spatial error (AIC 370.3),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.704.
+2017,Spatial error (AIC 373.6),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.702.
+2018,Spatial error (AIC 376.4),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.699.
+2019,Spatial error (AIC 379.0),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.694.
+2020,Spatial error (AIC 381.0),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.690.
+2021,Spatial error (AIC 617.6),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.369.
+2022,Spatial error (AIC 615.3),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.223.
+2023,Spatial error (AIC 616.3),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.348.
+2024,Spatial error (AIC 626.5),spatial_error,Estimated offline with spatialreg using centroid 4-nearest-neighbor weights fallback; formula: public mental health spending per capita ~ need index; lambda=0.384.
