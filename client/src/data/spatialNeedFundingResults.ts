@@ -14,6 +14,7 @@ export interface ExternalSpatialNeedFundingDiagnostic {
 }
 
 // Populate these arrays with outputs from an external SAR/SEM workflow.
+// `pnpm analysis:fit:spatial` will overwrite this file from the exported state-year panel.
 // The dashboard will prefer these predictions over the in-browser OLS baseline when present.
 export const externalSpatialNeedFundingResults: ExternalSpatialNeedFundingResult[] = [];
 
