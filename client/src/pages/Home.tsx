@@ -1099,11 +1099,20 @@ export default function Home() {
                       <XAxis dataKey="year" stroke="#6b7280" />
                       <YAxis stroke="#6b7280" />
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                        formatter={(value: number, name: string) => [
-                          value,
-                          name === "expansion_mean_mismatch_index" ? "Expansion states" : "Non-expansion states",
-                        ]}
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          return (
+                            <div className="rounded-lg border bg-white px-3 py-2 shadow-sm">
+                              <p className="text-xs font-semibold text-foreground mb-2">Year: {label}</p>
+                              {payload.map((entry) => (
+                                <p key={entry.dataKey} className="text-xs text-muted-foreground">
+                                  <span className="font-medium text-foreground">{entry.name}:</span>{" "}
+                                  {Number(entry.value).toFixed(2)}
+                                </p>
+                              ))}
+                            </div>
+                          );
+                        }}
                       />
                       <Legend />
                       <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
@@ -1134,7 +1143,7 @@ export default function Home() {
                             {selectedFinancingAnalysisYear} mismatch distribution by expansion status
                           </h3>
                           <p className="text-xs text-muted-foreground">
-                            Each point is a state. Higher mismatch index values indicate more funding than predicted given need; lower values indicate greater underfunding.
+                            Each point is a state in the selected year. The x-axis splits states into expansion and non-expansion groups, and the y-axis shows the mismatch index, which is actual minus model-predicted funding given need. The plot is intended to show whether one policy group tends to sit higher or lower in the funding-gap distribution; it is descriptive, not causal.
                           </p>
                         </div>
                         <div className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -1155,13 +1164,26 @@ export default function Home() {
                           <YAxis type="number" dataKey="mismatch_index" stroke="#6b7280" />
                           <Tooltip
                             cursor={{ strokeDasharray: "4 4" }}
-                            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                            labelFormatter={(_label: unknown, payload: any[]) =>
-                              payload?.[0]?.payload
-                                ? `${payload[0].payload.state} (${payload[0].payload.abbreviation}) - ${payload[0].payload.medicaid_expansion_label}`
-                                : ""
-                            }
-                            formatter={(value: number) => [value, "Mismatch Index"]}
+                            content={({ active, payload }) => {
+                              const point = payload?.[0]?.payload as (typeof expansionMismatchDistribution)[number] | undefined;
+                              if (!active || !point) return null;
+                              return (
+                                <div className="rounded-lg border bg-white px-3 py-2 shadow-sm">
+                                  <p className="text-xs font-semibold text-foreground">
+                                    {point.state} ({point.abbreviation})
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mb-2">{point.medicaid_expansion_label}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">Mismatch Index:</span>{" "}
+                                    {Number(point.mismatch_index).toFixed(2)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">Gap per Capita:</span> $
+                                    {Number(point.funding_gap_per_capita).toFixed(2)}
+                                  </p>
+                                </div>
+                              );
+                            }}
                           />
                           <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
                           <Scatter data={expansionMismatchDistribution} name="State-years">
