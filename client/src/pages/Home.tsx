@@ -39,6 +39,7 @@ import {
   FINANCING_YEARS,
   getExpansionEventTrend,
   getExpansionMismatchDistribution,
+  getExpansionMismatchSummary,
   getExpansionMismatchTrend,
   getGapScoreExportRows,
   getFinancingProvenanceSummary,
@@ -146,6 +147,7 @@ export default function Home() {
   const selectedTypologySummary = getTypologySummaryByYear(selectedFinancingAnalysisYear);
   const expansionMismatchTrend = getExpansionMismatchTrend();
   const expansionMismatchDistribution = getExpansionMismatchDistribution(selectedFinancingAnalysisYear);
+  const expansionMismatchSummary = getExpansionMismatchSummary(selectedFinancingAnalysisYear);
   const expansionEventTrend = getExpansionEventTrend();
   const medicaidExpansionPolicyRegression = getMedicaidExpansionPolicyRegression();
   const selectedExpansionStateTrend = getStateExpansionTrend(selectedExpansionState);
@@ -1148,6 +1150,28 @@ export default function Home() {
                         </div>
                         <div className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                           Year: {selectedFinancingAnalysisYear}
+                        </div>
+                      </div>
+                      <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="rounded-lg bg-emerald-50 p-3">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">Expansion Mean</p>
+                          <p className="text-lg font-bold text-foreground">{expansionMismatchSummary.expansion_mean_mismatch_index}</p>
+                          <p className="text-xs text-muted-foreground">n = {expansionMismatchSummary.expansion_count}</p>
+                        </div>
+                        <div className="rounded-lg bg-orange-50 p-3">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">Non-Expansion Mean</p>
+                          <p className="text-lg font-bold text-foreground">{expansionMismatchSummary.non_expansion_mean_mismatch_index}</p>
+                          <p className="text-xs text-muted-foreground">n = {expansionMismatchSummary.non_expansion_count}</p>
+                        </div>
+                        <div className="rounded-lg bg-blue-50 p-3">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">Mean Difference</p>
+                          <p className="text-lg font-bold text-foreground">{expansionMismatchSummary.mean_difference}</p>
+                          <p className="text-xs text-muted-foreground">Expansion minus non-expansion</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 p-3">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">p-value</p>
+                          <p className="text-lg font-bold text-foreground">{expansionMismatchSummary.pValue}</p>
+                          <p className="text-xs text-muted-foreground">Welch-style mean comparison</p>
                         </div>
                       </div>
                       <ResponsiveContainer width="100%" height={300}>

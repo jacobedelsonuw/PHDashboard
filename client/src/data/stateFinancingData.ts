@@ -139,6 +139,16 @@ export interface ExpansionMismatchDistributionPoint {
   x_position: number;
 }
 
+export interface ExpansionMismatchYearSummary {
+  year: FinancingYear;
+  expansion_mean_mismatch_index: number;
+  non_expansion_mean_mismatch_index: number;
+  mean_difference: number;
+  pValue: number;
+  expansion_count: number;
+  non_expansion_count: number;
+}
+
 export interface ExpansionEventTrendPoint {
   event_time: number;
   mean_mismatch_index: number;
@@ -253,6 +263,20 @@ const standardDeviation = (values: number[]) => {
   if (values.length <= 1) return 0;
   const avg = mean(values);
   return Math.sqrt(values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / values.length);
+};
+const normalCdf = (value: number) => {
+  const sign = value < 0 ? -1 : 1;
+  const x = Math.abs(value) / Math.sqrt(2);
+  const t = 1 / (1 + 0.3275911 * x);
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const erf =
+    1 -
+    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x));
+  return 0.5 * (1 + sign * erf);
 };
 
 const computeTrendSlope = (pairs: Array<{ x: number; y: number }>) => {
@@ -833,6 +857,34 @@ export const getExpansionMismatchDistribution = (year: FinancingYear): Expansion
       x_position: record.medicaid_expansion_status + jitter,
     };
   });
+};
+
+export const getExpansionMismatchSummary = (year: FinancingYear): ExpansionMismatchYearSummary => {
+  const rows = getStateFinancingByYear(year);
+  const expansionRows = rows.filter((record) => record.medicaid_expansion_status === 1);
+  const nonExpansionRows = rows.filter((record) => record.medicaid_expansion_status === 0);
+  const expansionValues = expansionRows.map((record) => record.mismatch_index);
+  const nonExpansionValues = nonExpansionRows.map((record) => record.mismatch_index);
+  const expansionMean = mean(expansionValues);
+  const nonExpansionMean = mean(nonExpansionValues);
+  const expansionVariance = expansionValues.length > 1 ? standardDeviation(expansionValues) ** 2 : 0;
+  const nonExpansionVariance = nonExpansionValues.length > 1 ? standardDeviation(nonExpansionValues) ** 2 : 0;
+  const standardError = Math.sqrt(
+    expansionVariance / Math.max(expansionValues.length, 1) +
+      nonExpansionVariance / Math.max(nonExpansionValues.length, 1)
+  );
+  const zScore = standardError === 0 ? 0 : (expansionMean - nonExpansionMean) / standardError;
+  const pValue = 2 * (1 - normalCdf(Math.abs(zScore)));
+
+  return {
+    year,
+    expansion_mean_mismatch_index: round(expansionMean, 2),
+    non_expansion_mean_mismatch_index: round(nonExpansionMean, 2),
+    mean_difference: round(expansionMean - nonExpansionMean, 2),
+    pValue: round(pValue, 4),
+    expansion_count: expansionRows.length,
+    non_expansion_count: nonExpansionRows.length,
+  };
 };
 
 export const getStateExpansionTrend = (abbreviation: string): ExpansionStateTrendPoint[] =>
