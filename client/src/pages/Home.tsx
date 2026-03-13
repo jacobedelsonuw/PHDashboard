@@ -41,6 +41,9 @@ import {
   getExpansionMismatchDistribution,
   getExpansionMismatchSummary,
   getExpansionMismatchTrend,
+  getFocusedLateExpansionGapPerCapitaEventTrend,
+  getFocusedLateExpansionGapPerCapitaItsSummary,
+  getFocusedLateExpansionGapPerCapitaStateSummaries,
   getFocusedLateExpansionEventTrend,
   getFocusedLateExpansionItsSummary,
   getFocusedLateExpansionStateSummaries,
@@ -157,6 +160,25 @@ export default function Home() {
   const focusedLateExpansionItsSummary = getFocusedLateExpansionItsSummary();
   const focusedLateExpansionEventTrend = getFocusedLateExpansionEventTrend();
   const focusedLateExpansionStateSummaries = getFocusedLateExpansionStateSummaries();
+  const focusedLateExpansionGapPerCapitaItsSummary = getFocusedLateExpansionGapPerCapitaItsSummary();
+  const focusedLateExpansionGapPerCapitaEventTrend = getFocusedLateExpansionGapPerCapitaEventTrend();
+  const focusedLateExpansionGapPerCapitaStateSummaries = getFocusedLateExpansionGapPerCapitaStateSummaries();
+  const focusedLateExpansionOutcomes = [
+    {
+      key: "mismatch",
+      summary: focusedLateExpansionItsSummary,
+      eventTrend: focusedLateExpansionEventTrend,
+      stateSummaries: focusedLateExpansionStateSummaries,
+      formatter: (value: number) => value.toFixed(2),
+    },
+    {
+      key: "gap_per_capita",
+      summary: focusedLateExpansionGapPerCapitaItsSummary,
+      eventTrend: focusedLateExpansionGapPerCapitaEventTrend,
+      stateSummaries: focusedLateExpansionGapPerCapitaStateSummaries,
+      formatter: (value: number) => `$${value.toFixed(2)}`,
+    },
+  ] as const;
   const medicaidExpansionPolicyRegression = getMedicaidExpansionPolicyRegression();
   const selectedExpansionStateTrend = getStateExpansionTrend(selectedExpansionState);
   const selectedExpansionStateMeta = expansionTransitionStates.find(
@@ -1392,7 +1414,7 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle>Focused Interrupted Time Series: Late Expansion States</CardTitle>
                   <CardDescription>
-                    Segmented time-series check for the late-adopting expansion states using the dashboard&apos;s alignment outcome. The outcome is the mismatch index, defined as the standardized need-funding gap score. Lower values indicate funding that sits further below the model-predicted level given burden.
+                    Segmented time-series check for the late-adopting expansion states using two alignment outcomes: the standardized mismatch index and the raw funding gap per capita. Both outcomes are defined relative to model-predicted public mental health spending given observed burden.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -1404,127 +1426,119 @@ export default function Home() {
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="rounded-lg bg-blue-50 p-4">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Outcome</p>
-                      <p className="text-sm font-bold text-foreground">{focusedLateExpansionItsSummary.outcomeLabel}</p>
-                    </div>
-                    <div className="rounded-lg bg-indigo-50 p-4">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Sample Size</p>
-                      <p className="text-xl font-bold text-foreground">{focusedLateExpansionItsSummary.sampleSize}</p>
-                    </div>
-                    <div className="rounded-lg bg-teal-50 p-4">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Adjusted R²</p>
-                      <p className="text-xl font-bold text-foreground">{focusedLateExpansionItsSummary.adjustedRSquared}</p>
-                    </div>
-                    <div className="rounded-lg bg-amber-50 p-4">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Main Signal</p>
-                      <p className="text-sm font-bold text-foreground">
-                        {((focusedLateExpansionItsSummary.coefficients.find((coefficient) => coefficient.term === "time_after")?.estimate ?? 0) < 0)
-                          ? "Post slope more negative"
-                          : "Post slope more positive"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border p-4">
-                    <h3 className="text-sm font-semibold text-foreground mb-3">Pooled segmented model with state fixed effects</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b text-left text-muted-foreground">
-                            <th className="py-2 pr-4 font-medium">Term</th>
-                            <th className="py-2 pr-4 font-medium">Estimate</th>
-                            <th className="py-2 pr-4 font-medium">SE</th>
-                            <th className="py-2 pr-4 font-medium">t</th>
-                            <th className="py-2 pr-4 font-medium">p</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {focusedLateExpansionItsSummary.coefficients.map((coefficient) => (
-                            <tr key={coefficient.term} className="border-b">
-                              <td className="py-2 pr-4">{coefficient.label}</td>
-                              <td className="py-2 pr-4">{coefficient.estimate}</td>
-                              <td className="py-2 pr-4">{coefficient.standardError}</td>
-                              <td className="py-2 pr-4">{coefficient.tStatistic}</td>
-                              <td className="py-2 pr-4">{coefficient.pValue}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <p className="mt-4 text-sm text-foreground">{focusedLateExpansionItsSummary.interpretation}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">{focusedLateExpansionItsSummary.note}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">{focusedLateExpansionItsSummary.caution}</p>
-                  </div>
-
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div className="rounded-lg border p-4">
-                      <h3 className="text-sm font-semibold text-foreground mb-1">Late-adopter event-time profile</h3>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Event time is centered on each state&apos;s first full expansion year. The line shows the pooled average mismatch index across the late-adopter set.
-                      </p>
-                      <ResponsiveContainer width="100%" height={280}>
-                        <LineChart data={focusedLateExpansionEventTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis dataKey="eventTime" stroke="#6b7280" />
-                          <YAxis stroke="#6b7280" />
-                          <Tooltip
-                            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-                            formatter={(value: number, name: string, item: any) => [
-                              name === "meanMismatchIndex" ? value.toFixed(2) : value,
-                              name === "meanMismatchIndex" ? "Mean mismatch index" : "State count",
-                            ]}
-                            labelFormatter={(value: number) => `Event time ${value}`}
-                          />
-                          <ReferenceLine x={0} stroke="#2563eb" strokeDasharray="5 5" />
-                          <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
-                          <Line
-                            type="monotone"
-                            dataKey="meanMismatchIndex"
-                            stroke="#7c3aed"
-                            strokeWidth={2.5}
-                            dot={{ r: 3 }}
-                            name="Mean mismatch index"
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {focusedLateExpansionOutcomes.map((outcome) => (
+                      <div key={outcome.key} className="rounded-lg border p-4 space-y-5">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg bg-blue-50 p-4">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">Outcome</p>
+                            <p className="text-sm font-bold text-foreground">{outcome.summary.outcomeLabel}</p>
+                          </div>
+                          <div className="rounded-lg bg-indigo-50 p-4">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">Adjusted R²</p>
+                            <p className="text-xl font-bold text-foreground">{outcome.summary.adjustedRSquared}</p>
+                          </div>
+                        </div>
 
-                    <div className="rounded-lg border p-4">
-                      <h3 className="text-sm font-semibold text-foreground mb-3">State-level pre/post summaries</h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b text-left text-muted-foreground">
-                              <th className="py-2 pr-4 font-medium">State</th>
-                              <th className="py-2 pr-4 font-medium">Pre mean</th>
-                              <th className="py-2 pr-4 font-medium">Post mean</th>
-                              <th className="py-2 pr-4 font-medium">Diff</th>
-                              <th className="py-2 pr-4 font-medium">Trend change</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {focusedLateExpansionStateSummaries.map((summary) => (
-                              <tr key={summary.abbreviation} className="border-b">
-                                <td className="py-2 pr-4">
-                                  {summary.abbreviation}
-                                  <span className="ml-2 text-xs text-muted-foreground">({summary.expansionYear})</span>
-                                </td>
-                                <td className="py-2 pr-4">{summary.preMeanMismatchIndex}</td>
-                                <td className="py-2 pr-4">{summary.postMeanMismatchIndex}</td>
-                                <td className="py-2 pr-4">{summary.meanDifference}</td>
-                                <td className="py-2 pr-4">
-                                  {summary.trendChange}
-                                  <span className="ml-1 text-xs text-muted-foreground">(p={summary.trendPValue})</span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <div className="rounded-lg border p-4">
+                          <h3 className="text-sm font-semibold text-foreground mb-3">Pooled segmented model with state fixed effects</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b text-left text-muted-foreground">
+                                  <th className="py-2 pr-4 font-medium">Term</th>
+                                  <th className="py-2 pr-4 font-medium">Estimate</th>
+                                  <th className="py-2 pr-4 font-medium">SE</th>
+                                  <th className="py-2 pr-4 font-medium">t</th>
+                                  <th className="py-2 pr-4 font-medium">p</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {outcome.summary.coefficients.map((coefficient) => (
+                                  <tr key={`${outcome.key}-${coefficient.term}`} className="border-b">
+                                    <td className="py-2 pr-4">{coefficient.label}</td>
+                                    <td className="py-2 pr-4">{coefficient.estimate}</td>
+                                    <td className="py-2 pr-4">{coefficient.standardError}</td>
+                                    <td className="py-2 pr-4">{coefficient.tStatistic}</td>
+                                    <td className="py-2 pr-4">{coefficient.pValue}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <p className="mt-4 text-sm text-foreground">{outcome.summary.interpretation}</p>
+                          <p className="mt-2 text-xs text-muted-foreground">{outcome.summary.note}</p>
+                        </div>
+
+                        <div className="rounded-lg border p-4">
+                          <h3 className="text-sm font-semibold text-foreground mb-1">Late-adopter event-time profile</h3>
+                          <p className="text-xs text-muted-foreground mb-4">
+                            Event time is centered on each state&apos;s first full expansion year. The line shows the pooled average {outcome.summary.outcomeShortLabel} across the late-adopter set.
+                          </p>
+                          <ResponsiveContainer width="100%" height={250}>
+                            <LineChart data={outcome.eventTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis dataKey="eventTime" stroke="#6b7280" />
+                              <YAxis stroke="#6b7280" />
+                              <Tooltip
+                                contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+                                formatter={(value: number, name: string) => [
+                                  outcome.formatter(value),
+                                  name === "meanOutcomeValue" ? `Mean ${outcome.summary.outcomeShortLabel}` : "State count",
+                                ]}
+                                labelFormatter={(value: number) => `Event time ${value}`}
+                              />
+                              <ReferenceLine x={0} stroke="#2563eb" strokeDasharray="5 5" />
+                              <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
+                              <Line
+                                type="monotone"
+                                dataKey="meanOutcomeValue"
+                                stroke="#7c3aed"
+                                strokeWidth={2.5}
+                                dot={{ r: 3 }}
+                                name={`Mean ${outcome.summary.outcomeShortLabel}`}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        <div className="rounded-lg border p-4">
+                          <h3 className="text-sm font-semibold text-foreground mb-3">State-level pre/post summaries</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b text-left text-muted-foreground">
+                                  <th className="py-2 pr-4 font-medium">State</th>
+                                  <th className="py-2 pr-4 font-medium">Pre mean</th>
+                                  <th className="py-2 pr-4 font-medium">Post mean</th>
+                                  <th className="py-2 pr-4 font-medium">Diff</th>
+                                  <th className="py-2 pr-4 font-medium">Trend change</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {outcome.stateSummaries.map((summary) => (
+                                  <tr key={`${outcome.key}-${summary.abbreviation}`} className="border-b">
+                                    <td className="py-2 pr-4">
+                                      {summary.abbreviation}
+                                      <span className="ml-2 text-xs text-muted-foreground">({summary.expansionYear})</span>
+                                    </td>
+                                    <td className="py-2 pr-4">{outcome.formatter(summary.preMeanValue)}</td>
+                                    <td className="py-2 pr-4">{outcome.formatter(summary.postMeanValue)}</td>
+                                    <td className="py-2 pr-4">{outcome.formatter(summary.meanDifference)}</td>
+                                    <td className="py-2 pr-4">
+                                      {outcome.formatter(summary.trendChange)}
+                                      <span className="ml-1 text-xs text-muted-foreground">(p={summary.trendPValue})</span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
+                  <p className="text-xs text-muted-foreground">{focusedLateExpansionItsSummary.caution}</p>
                 </CardContent>
               </Card>
 
