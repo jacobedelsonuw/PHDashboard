@@ -1158,13 +1158,10 @@ export default function Home() {
                             contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
                             labelFormatter={(_label: unknown, payload: any[]) =>
                               payload?.[0]?.payload
-                                ? `${payload[0].payload.state} (${payload[0].payload.abbreviation})`
+                                ? `${payload[0].payload.state} (${payload[0].payload.abbreviation}) - ${payload[0].payload.medicaid_expansion_label}`
                                 : ""
                             }
-                            formatter={(value: number, _name: string, item: any) => {
-                              const payload = item.payload as (typeof expansionMismatchDistribution)[number];
-                              return [value, `${payload.medicaid_expansion_label} mismatch index`];
-                            }}
+                            formatter={(value: number) => [value, "Mismatch Index"]}
                           />
                           <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
                           <Scatter data={expansionMismatchDistribution} name="State-years">
